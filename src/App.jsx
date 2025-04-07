@@ -79,7 +79,7 @@ export default function App() {
 
   return (
     <div className="bg-white flex justify-center min-h-screen">
-      <div className="flex flex-col w-full max-w-[430px] min-h-screen bg-white shadow-md relative pb-20 mx-auto">
+      <div className="flex flex-col w-full max-w-[430px] min-h-screen bg-white relative pb-20 mx-auto">
         <div className="flex justify-between items-center px-4 py-3 border-b">
           <div className="flex items-center space-x-2">
             <div className="relative w-6 h-6 rounded-full bg-black">
@@ -165,7 +165,7 @@ export default function App() {
           )}
         </div>
 
-        <div className="h-16 w-full border-t flex justify-around items-center bg-white shadow-md fixed bottom-4 left-1/2 -translate-x-1/2 max-w-[430px] z-20">
+        <div className="h-16 w-full border-t flex justify-around items-center bg-white static mt-auto">
           <div className="flex flex-col items-center text-xs">
             <User className="w-5 h-5" />
             <span>Profile</span>
