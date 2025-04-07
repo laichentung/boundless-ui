@@ -108,8 +108,8 @@ export default function App() {
             <MapContainer
               center={mapCenter}
               zoom={13}
-              zoomControl={false}
               scrollWheelZoom={true}
+              zoomControl={false}
               className="h-full w-full z-0"
             >
               <TileLayer
@@ -133,7 +133,7 @@ export default function App() {
 
           {/* 🔍 Search Bar */}
           {mode === "map" && (
-            <div className="absolute top-20 left-0 right-0 px-4 z-10">
+            <div className="absolute top-[68px] left-0 right-0 px-4 z-10">
               <input
                 type="text"
                 placeholder="Search..."
@@ -144,7 +144,7 @@ export default function App() {
 
           {/* 📍 Recenter / Filter / + 按鈕 */}
           {mode === "map" && (
-            <div className="absolute bottom-24 right-4 flex flex-col space-y-3 z-10">
+            <div className="absolute bottom-20 right-4 flex flex-col space-y-3 z-10">
               <button
                 className="bg-white border rounded-full p-3 shadow"
                 onClick={() => {
