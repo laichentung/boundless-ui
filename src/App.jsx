@@ -45,12 +45,12 @@ function CurrentLocationMarker({ onLocate }) {
           map.setView(coords, 15);
         },
         (err) => {
-          setError("定位失敗，請允許位置存取");
+          setError("localization failed, please admit accessing location");
           console.error("Geolocation error:", err);
         }
       );
     } else {
-      setError("瀏覽器不支援定位功能");
+      setError("browser doesn't support localization function");
     }
   }, [map, onLocate]);
 
