@@ -108,6 +108,7 @@ export default function App() {
             <MapContainer
               center={mapCenter}
               zoom={13}
+              zoomControl={false}
               scrollWheelZoom={true}
               className="h-full w-full z-0"
             >
