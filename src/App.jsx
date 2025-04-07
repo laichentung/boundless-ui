@@ -1,34 +1,55 @@
 import { useEffect, useState } from "react";
 import {
-  User, Wallet, Share2, Bot, CalendarCheck2, Plus, Filter,
+  User,
+  Wallet,
+  Share2,
+  Bot,
+  CalendarCheck2,
+  Plus,
+  Filter,
 } from "lucide-react";
 import {
-  MapContainer, TileLayer, Marker, Popup,
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  useMap,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
+// 修正 Leaflet marker 圖示載入
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconRetinaUrl:
+    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
+// ✅ 使用者定位 + 地圖移動中心
 function CurrentLocationMarker() {
   const [position, setPosition] = useState(null);
   const [error, setError] = useState(null);
+  const map = useMap(); // 地圖控制器
 
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => setPosition([pos.coords.latitude, pos.coords.longitude]),
-        (err) => setError("定位失敗，請允許位置存取")
+        (pos) => {
+          const coords = [pos.coords.latitude, pos.coords.longitude];
+          setPosition(coords);
+          map.setView(coords, 15); // ✅ 讓地圖以定位為中心
+        },
+        (err) => {
+          setError("定位失敗，請允許位置存取");
+          console.error("Geolocation error:", err);
+        }
       );
     } else {
       setError("瀏覽器不支援定位功能");
     }
-  }, []);
+  }, [map]);
 
   return (
     <>
@@ -52,6 +73,8 @@ export default function App() {
   return (
     <div className="bg-neutral-100 flex justify-center min-h-screen">
       <div className="flex flex-col w-full max-w-[430px] min-h-screen bg-white shadow-md relative pb-16">
+
+        {/* Top Search */}
         <div className="p-4 z-10 bg-white">
           <input
             type="text"
@@ -71,9 +94,10 @@ export default function App() {
           </div>
         </div>
 
+        {/* Map + Floating Cards */}
         <div className="relative flex-1 z-0">
           <MapContainer
-            center={[25.0340, 121.5623]}
+            center={[25.0340, 121.5623]} // 預設台北，會被 setView 替換
             zoom={13}
             scrollWheelZoom={true}
             className="h-full w-full z-0"
@@ -85,6 +109,7 @@ export default function App() {
             <CurrentLocationMarker />
           </MapContainer>
 
+          {/* Floating Cards */}
           <div className="absolute bottom-20 left-0 right-0 px-4 space-y-3 z-10">
             <div className="bg-white rounded-xl shadow p-4">
               <div className="font-semibold">Street Music Night</div>
@@ -97,6 +122,7 @@ export default function App() {
           </div>
         </div>
 
+        {/* Bottom Navigation */}
         <div className="h-16 w-full border-t flex justify-around items-center bg-white shadow-md fixed bottom-0 left-0 max-w-[430px] z-20">
           <div className="flex flex-col items-center text-xs">
             <User className="w-5 h-5" />
