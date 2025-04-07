@@ -30,7 +30,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-function CurrentLocationMarker({ onLocate }) {
+function CurrentLocationMarker({ onLocate, setMap }) {
   const [position, setPosition] = useState(null);
   const [error, setError] = useState(null);
   const map = useMap();
@@ -42,17 +42,18 @@ function CurrentLocationMarker({ onLocate }) {
           const coords = [pos.coords.latitude, pos.coords.longitude];
           setPosition(coords);
           onLocate(coords);
+          setMap(map);
           map.setView(coords, 15);
         },
         (err) => {
-          setError("localization failed, please admit accessing location");
+          setError("定位失敗，請允許位置存取");
           console.error("Geolocation error:", err);
         }
       );
     } else {
-      setError("browser doesn't support localization function");
+      setError("瀏覽器不支援定位功能");
     }
-  }, [map, onLocate]);
+  }, [map, onLocate, setMap]);
 
   return (
     <>
@@ -78,7 +79,7 @@ export default function App() {
 
   return (
     <div className="bg-neutral-100 flex justify-center min-h-screen">
-      <div className="flex flex-col w-full max-w-[430px] min-h-screen bg-white shadow-md relative pb-16">
+      <div className="flex flex-col w-full max-w-[430px] min-h-screen bg-white shadow-md relative pb-16 mx-auto">
         <div className="flex justify-between items-center px-4 py-3 border-b">
           <div className="flex items-center space-x-2">
             <div className="relative w-6 h-6 rounded-full bg-black">
@@ -108,14 +109,13 @@ export default function App() {
               center={mapCenter}
               zoom={13}
               scrollWheelZoom={true}
-              whenCreated={setMapRef}
               className="h-full w-full z-0"
             >
               <TileLayer
                 attribution='&copy; Carto'
                 url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
               />
-              <CurrentLocationMarker onLocate={setMapCenter} />
+              <CurrentLocationMarker onLocate={setMapCenter} setMap={setMapRef} />
             </MapContainer>
           ) : (
             <div className="p-4 space-y-4">
@@ -130,28 +130,41 @@ export default function App() {
             </div>
           )}
 
+          {/* 🔍 Search Bar */}
+          {mode === "map" && (
+            <div className="absolute top-20 left-0 right-0 px-4 z-10">
+              <input
+                type="text"
+                placeholder="Search..."
+                className="w-full p-3 rounded-xl border border-gray-300 bg-white shadow"
+              />
+            </div>
+          )}
+
           {/* 📍 Recenter / Filter / + 按鈕 */}
           {mode === "map" && (
-            <div className="absolute bottom-24 right-4 flex flex-col space-y-2 z-10">
+            <div className="absolute bottom-24 right-4 flex flex-col space-y-3 z-10">
               <button
-                className="bg-white border rounded-full p-2 shadow"
+                className="bg-white border rounded-full p-3 shadow"
                 onClick={() => {
-                  if (mapRef) mapRef.setView(mapCenter, 15);
+                  if (mapRef && mapCenter) {
+                    mapRef.setView(mapCenter, 15);
+                  }
                 }}
               >
-                <LocateFixed className="w-5 h-5 text-black" />
+                <LocateFixed className="w-6 h-6 text-black" />
               </button>
-              <button className="bg-white border rounded-full p-2 shadow">
-                <Filter className="w-5 h-5 text-black" />
+              <button className="bg-white border rounded-full p-3 shadow">
+                <Filter className="w-6 h-6 text-black" />
               </button>
-              <button className="bg-black text-white rounded-full p-2 shadow">
-                <Plus className="w-5 h-5" />
+              <button className="bg-black text-white rounded-full p-3 shadow">
+                <Plus className="w-6 h-6" />
               </button>
             </div>
           )}
         </div>
 
-        <div className="h-16 w-full border-t flex justify-around items-center bg-white shadow-md fixed bottom-0 left-0 max-w-[430px] z-20">
+        <div className="h-16 w-full border-t flex justify-around items-center bg-white shadow-md fixed bottom-0 left-1/2 -translate-x-1/2 max-w-[430px] z-20">
           <div className="flex flex-col items-center text-xs">
             <User className="w-5 h-5" />
             <span>Profile</span>
