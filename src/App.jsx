@@ -78,7 +78,7 @@ export default function App() {
   const [mapRef, setMapRef] = useState(null);
 
   return (
-    <div className="bg-neutral-100 flex justify-center min-h-screen">
+    <div className="bg-white flex justify-center min-h-screen">
       <div className="flex flex-col w-full max-w-[430px] min-h-screen bg-white shadow-md relative pb-20 mx-auto">
         <div className="flex justify-between items-center px-4 py-3 border-b">
           <div className="flex items-center space-x-2">
