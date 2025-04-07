@@ -72,41 +72,32 @@ function CurrentLocationMarker({ onLocate }) {
 
 export default function App() {
   const [showFilter, setShowFilter] = useState(false);
-  const [mode, setMode] = useState("map"); // map or list
+  const [mode, setMode] = useState("map");
   const [mapCenter, setMapCenter] = useState([25.0340, 121.5623]);
+  const [mapRef, setMapRef] = useState(null);
 
   return (
     <div className="bg-neutral-100 flex justify-center min-h-screen">
       <div className="flex flex-col w-full max-w-[430px] min-h-screen bg-white shadow-md relative pb-16">
-        <div className="p-4 z-10 bg-white">
-          <input
-            type="text"
-            placeholder="Search..."
-            className="w-full p-3 rounded-xl border border-gray-300"
-          />
-          <div className="flex justify-between items-center mt-4">
-            <button
-              className="border px-3 py-1 rounded flex items-center text-sm"
-              onClick={() => setShowFilter(!showFilter)}
-            >
-              <Filter className="w-4 h-4 mr-1" /> Filter
-            </button>
-            <button className="bg-black text-white rounded-full p-2">
-              <Plus className="w-4 h-4" />
-            </button>
+        <div className="flex justify-between items-center px-4 py-3 border-b">
+          <div className="flex items-center space-x-2">
+            <div className="relative w-6 h-6 rounded-full bg-black">
+              <div className="absolute w-1 h-1 bg-white rounded-full top-1 left-1" />
+            </div>
+            <span className="font-semibold text-lg">Boundless</span>
           </div>
-          <div className="flex justify-center mt-4 space-x-4">
+          <div className="flex space-x-2">
             <button
-              className={`px-3 py-1 rounded flex items-center text-sm border ${mode === "map" ? "bg-black text-white" : "bg-white text-black"}`}
+              className={`p-2 rounded ${mode === "map" ? "bg-black text-white" : "bg-gray-200 text-black"}`}
               onClick={() => setMode("map")}
             >
-              <MapIcon className="w-4 h-4 mr-1" /> 地圖模式
+              <MapIcon className="w-4 h-4" />
             </button>
             <button
-              className={`px-3 py-1 rounded flex items-center text-sm border ${mode === "list" ? "bg-black text-white" : "bg-white text-black"}`}
+              className={`p-2 rounded ${mode === "list" ? "bg-black text-white" : "bg-gray-200 text-black"}`}
               onClick={() => setMode("list")}
             >
-              <ListIcon className="w-4 h-4 mr-1" /> 活動列表
+              <ListIcon className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -117,6 +108,7 @@ export default function App() {
               center={mapCenter}
               zoom={13}
               scrollWheelZoom={true}
+              whenCreated={setMapRef}
               className="h-full w-full z-0"
             >
               <TileLayer
@@ -138,14 +130,24 @@ export default function App() {
             </div>
           )}
 
-          {/* 📍 Recenter 按鈕 */}
+          {/* 📍 Recenter / Filter / + 按鈕 */}
           {mode === "map" && (
-            <button
-              className="absolute bottom-24 right-4 bg-white border rounded-full p-2 shadow z-10"
-              onClick={() => setMapCenter([...mapCenter])}
-            >
-              <LocateFixed className="w-5 h-5 text-black" />
-            </button>
+            <div className="absolute bottom-24 right-4 flex flex-col space-y-2 z-10">
+              <button
+                className="bg-white border rounded-full p-2 shadow"
+                onClick={() => {
+                  if (mapRef) mapRef.setView(mapCenter, 15);
+                }}
+              >
+                <LocateFixed className="w-5 h-5 text-black" />
+              </button>
+              <button className="bg-white border rounded-full p-2 shadow">
+                <Filter className="w-5 h-5 text-black" />
+              </button>
+              <button className="bg-black text-white rounded-full p-2 shadow">
+                <Plus className="w-5 h-5" />
+              </button>
+            </div>
           )}
         </div>
 
