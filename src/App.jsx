@@ -79,7 +79,7 @@ export default function App() {
 
   return (
     <div className="bg-white flex justify-center min-h-screen">
-      <div className="flex flex-col w-full max-w-[430px] min-h-screen bg-white relative pb-4 mx-auto">
+      <div className="flex flex-col w-full max-w-[430px] min-h-screen bg-white relative pb-2 mx-auto">
         <div className="flex justify-between items-center px-4 py-3 border-b">
           <div className="flex items-center space-x-2">
             <div className="relative w-6 h-6 rounded-full bg-black">
