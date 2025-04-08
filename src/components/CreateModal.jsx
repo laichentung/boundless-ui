@@ -3,15 +3,17 @@ import { useState } from "react";
 const categories = [
   { type: "activity", label: "Meal" },
   { type: "activity", label: "Ride" },
-  { type: "activity", label: "Performance" },
-  { type: "activity", label: "Partner" },
+  { type: "activity", label: "Meet-up" },
   { type: "activity", label: "Help" },
+  { type: "activity", label: "Relaxation" },
+  { type: "activity", label: "Entertainment" },
+  { type: "activity", label: "Others" },
   { type: "resource", label: "Space" },
   { type: "resource", label: "Parking" },
   { type: "resource", label: "Food" },
-  { type: "resource", label: "Electronics" },
-  { type: "resource", label: "Clothes" },
-  { type: "resource", label: "Tools" },
+  { type: "resource", label: "Items" },
+  { type: "resource", label: "Clothing" },
+  { type: "resource", label: "Others" },
 ];
 
 export default function CreateModal({ onClose }) {
