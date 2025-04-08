@@ -13,17 +13,19 @@ const categories = [
   { type: "activity", label: "Others" },
   { type: "resource", label: "Space" },
   { type: "resource", label: "Parking" },
-  { type: "resource", label: "Food" },
+  { type: "resource", label: "Food/Drinks" },
   { type: "resource", label: "Items" },
   { type: "resource", label: "Clothing" },
   { type: "resource", label: "Others" },
 ];
 
 function LocationSelector({ setLocation }) {
-  useMapEvents({
+  const map = useMapEvents({
     click(e) {
       const { lat, lng } = e.latlng;
-      setLocation([lat, lng]);
+      const containerPoint = map.latLngToContainerPoint(e.latlng);
+      const correctedLatLng = map.containerPointToLatLng(containerPoint);
+      setLocation([correctedLatLng.lat, correctedLatLng.lng]);
     },
   });
   return null;
@@ -81,8 +83,8 @@ export default function CreateModal({ onClose }) {
       <div className="bg-white w-[90%] max-w-md rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center">
           <h2 className="text-lg font-semibold">
-            {step === 1 && "Choose a Category"}
-            {step === 2 && "Activity Details"}
+            {step === 1 && "I want to share..."}
+            {step === 2 && "Shared Details"}
           </h2>
           <button onClick={onClose} className="text-sm text-gray-400 hover:text-black">
             ✕
@@ -137,13 +139,15 @@ export default function CreateModal({ onClose }) {
               onChange={handleInput}
               className="w-full border px-3 py-2 rounded-md"
             />
-            <label className="text-sm text-gray-500">Time</label>
+            <label className="block text-sm font-semibold text-gray-600">Time</label>
             <input
               name="time"
               type="datetime-local"
               onChange={handleInput}
               className="w-full border px-3 py-2 rounded-md"
             />
+
+            <label className="block text-sm font-semibold text-gray-600">Location</label>
             <div className="w-full h-56 rounded-md overflow-hidden">
               <MapContainer
                 center={[25.033, 121.5654]}
@@ -173,10 +177,12 @@ export default function CreateModal({ onClose }) {
                   });
                 }
               }}
-              className="text-sm text-blue-500 underline"
+              className="text-sm mt-1 px-3 py-2 border rounded-md text-black hover:bg-gray-100"
             >
-              Use Current Location
+              📍 Use My Current Location
             </button>
+
+            <label className="block text-sm font-semibold text-gray-600">Price</label>
             <div className="flex gap-2">
               <select
                 name="unit"
@@ -197,6 +203,7 @@ export default function CreateModal({ onClose }) {
                 className="flex-1 border px-3 py-2 rounded-md bg-white disabled:bg-gray-100"
               />
             </div>
+
             <textarea
               name="description"
               placeholder="Description"
