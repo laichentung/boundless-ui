@@ -1,14 +1,22 @@
 import { useState } from "react";
 
-const categories = {
-  activity: ["meal", "ride", "performance", "partner", "help"],
-  resource: ["space", "parking", "food", "electronics", "clothes", "tools"],
-};
+const categories = [
+  { type: "activity", label: "Meal" },
+  { type: "activity", label: "Ride" },
+  { type: "activity", label: "Performance" },
+  { type: "activity", label: "Partner" },
+  { type: "activity", label: "Help" },
+  { type: "resource", label: "Space" },
+  { type: "resource", label: "Parking" },
+  { type: "resource", label: "Food" },
+  { type: "resource", label: "Electronics" },
+  { type: "resource", label: "Clothes" },
+  { type: "resource", label: "Tools" },
+];
 
 export default function CreateModal({ onClose }) {
   const [step, setStep] = useState(1);
-  const [type, setType] = useState(null);
-  const [subtype, setSubtype] = useState(null);
+  const [selected, setSelected] = useState(null);
   const [formData, setFormData] = useState({
     time: "",
     location: "",
@@ -16,11 +24,6 @@ export default function CreateModal({ onClose }) {
     description: "",
     photos: [],
   });
-
-  const handleNext = () => {
-    if (step === 1 && type) setStep(2);
-    if (step === 2 && subtype) setStep(3);
-  };
 
   const handleInput = (e) => {
     const { name, value } = e.target;
@@ -35,21 +38,19 @@ export default function CreateModal({ onClose }) {
   const handleSubmit = () => {
     const activity = {
       ...formData,
-      type,
-      subtype,
+      ...selected,
     };
     console.log("Activity created:", activity);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white w-full max-w-md rounded-xl p-6 space-y-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white w-[90%] max-w-md rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center">
           <h2 className="text-lg font-semibold">
-            {step === 1 && "Choose Category"}
-            {step === 2 && "Choose Type"}
-            {step === 3 && "Create Activity"}
+            {step === 1 && "Choose a Category"}
+            {step === 2 && "Activity Details"}
           </h2>
           <button onClick={onClose} className="text-sm text-gray-400 hover:text-black">
             ✕
@@ -58,37 +59,22 @@ export default function CreateModal({ onClose }) {
 
         {step === 1 && (
           <div className="grid grid-cols-2 gap-3">
-            {Object.keys(categories).map((key) => (
+            {categories.map((item) => (
               <button
-                key={key}
-                onClick={() => setType(key)}
-                className={`p-3 rounded-lg border text-sm capitalize hover:bg-gray-100 ${
-                  type === key ? "border-black" : "border-gray-300"
-                }`}
+                key={item.label}
+                onClick={() => {
+                  setSelected(item);
+                  setStep(2);
+                }}
+                className="p-3 rounded-xl border border-gray-300 hover:border-black hover:bg-gray-50 text-sm capitalize"
               >
-                {key.replace("activity", "service/activity")}
+                {item.label}
               </button>
             ))}
           </div>
         )}
 
-        {step === 2 && type && (
-          <div className="grid grid-cols-2 gap-3">
-            {categories[type].map((item) => (
-              <button
-                key={item}
-                onClick={() => setSubtype(item)}
-                className={`p-3 rounded-lg border text-sm capitalize hover:bg-gray-100 ${
-                  subtype === item ? "border-black" : "border-gray-300"
-                }`}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {step === 3 && (
+        {step === 2 && (
           <div className="space-y-3">
             <input
               name="time"
@@ -123,27 +109,16 @@ export default function CreateModal({ onClose }) {
               onChange={handlePhotoUpload}
               className="w-full"
             />
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={handleSubmit}
+                className="bg-black text-white px-4 py-2 rounded-md"
+              >
+                Publish
+              </button>
+            </div>
           </div>
         )}
-
-        <div className="pt-2 flex justify-end">
-          {step < 3 ? (
-            <button
-              onClick={handleNext}
-              disabled={(step === 1 && !type) || (step === 2 && !subtype)}
-              className="bg-black text-white px-4 py-2 rounded-md disabled:opacity-40"
-            >
-              Next
-            </button>
-          ) : (
-            <button
-              onClick={handleSubmit}
-              className="bg-black text-white px-4 py-2 rounded-md"
-            >
-              Publish
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );
