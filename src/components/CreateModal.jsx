@@ -13,7 +13,7 @@ const categories = [
   { type: "activity", label: "Others" },
   { type: "resource", label: "Space" },
   { type: "resource", label: "Parking" },
-  { type: "resource", label: "Food/Drinks" },
+  { type: "resource", label: "Food / Drinks" },
   { type: "resource", label: "Items" },
   { type: "resource", label: "Clothing" },
   { type: "resource", label: "Others" },
@@ -22,10 +22,7 @@ const categories = [
 function LocationSelector({ setLocation }) {
   const map = useMapEvents({
     click(e) {
-      const { lat, lng } = e.latlng;
-      const containerPoint = map.latLngToContainerPoint(e.latlng);
-      const correctedLatLng = map.containerPointToLatLng(containerPoint);
-      setLocation([correctedLatLng.lat, correctedLatLng.lng]);
+      setLocation([e.latlng.lat, e.latlng.lng]);
     },
   });
   return null;
@@ -49,9 +46,11 @@ export default function CreateModal({ onClose }) {
   const [step, setStep] = useState(1);
   const [selected, setSelected] = useState(null);
   const [location, setLocation] = useState(null);
+  const [address, setAddress] = useState("");
   const [formData, setFormData] = useState({
     title: "",
-    time: "",
+    timeStart: "",
+    timeEnd: "",
     price: "",
     unit: "USD",
     description: "",
@@ -68,10 +67,23 @@ export default function CreateModal({ onClose }) {
     setFormData({ ...formData, photos: files });
   };
 
+  const handleAddressSearch = async () => {
+    const query = encodeURIComponent(address);
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`
+    );
+    const data = await res.json();
+    if (data && data.length > 0) {
+      const { lat, lon } = data[0];
+      setLocation([parseFloat(lat), parseFloat(lon)]);
+    }
+  };
+
   const handleSubmit = () => {
     const activity = {
       ...formData,
       location,
+      address,
       ...selected,
     };
     console.log("Activity created:", activity);
@@ -140,14 +152,31 @@ export default function CreateModal({ onClose }) {
               className="w-full border px-3 py-2 rounded-md"
             />
             <label className="block text-sm font-semibold text-gray-600">Time</label>
+            <div className="flex gap-2">
+              <input
+                name="timeStart"
+                type="datetime-local"
+                onChange={handleInput}
+                className="w-full border px-3 py-2 rounded-md"
+              />
+              <input
+                name="timeEnd"
+                type="datetime-local"
+                onChange={handleInput}
+                className="w-full border px-3 py-2 rounded-md"
+              />
+            </div>
+
+            <label className="block text-sm font-semibold text-gray-600">Location</label>
             <input
-              name="time"
-              type="datetime-local"
-              onChange={handleInput}
+              type="text"
+              placeholder="Search address..."
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              onBlur={handleAddressSearch}
               className="w-full border px-3 py-2 rounded-md"
             />
 
-            <label className="block text-sm font-semibold text-gray-600">Location</label>
             <div className="w-full h-56 rounded-md overflow-hidden">
               <MapContainer
                 center={[25.033, 121.5654]}
