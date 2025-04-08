@@ -20,6 +20,7 @@ import {
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import CreateModal from "./components/CreateModal";
 
 // Fix Leaflet icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -76,10 +77,11 @@ export default function App() {
   const [mode, setMode] = useState("map");
   const [mapCenter, setMapCenter] = useState([25.0340, 121.5623]);
   const [mapRef, setMapRef] = useState(null);
+  const [showCreate, setShowCreate] = useState(false);
 
   return (
     <div className="bg-white flex justify-center min-h-screen">
-      <div className="flex flex-col w-full max-w-[430px] min-h-screen bg-white relative pb-2 mx-auto">
+      <div className="flex flex-col w-full max-w-[430px] min-h-screen bg-white relative pb-4 mx-auto">
         <div className="flex justify-between items-center px-4 py-3 border-b">
           <div className="flex items-center space-x-2">
             <div className="relative w-6 h-6 rounded-full bg-black">
@@ -158,7 +160,10 @@ export default function App() {
               <button className="bg-white border rounded-full p-3 shadow">
                 <Filter className="w-6 h-6 text-black" />
               </button>
-              <button className="bg-black text-white rounded-full p-3 shadow">
+              <button
+                onClick={() => setShowCreate(true)}
+                className="bg-black text-white rounded-full p-3 shadow"
+              >
                 <Plus className="w-6 h-6" />
               </button>
             </div>
@@ -187,6 +192,8 @@ export default function App() {
             <span>To-do</span>
           </div>
         </div>
+
+        {showCreate && <CreateModal onClose={() => setShowCreate(false)} />}
       </div>
     </div>
   );
