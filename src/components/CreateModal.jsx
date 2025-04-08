@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { MapContainer, TileLayer, useMapEvents, Marker } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 const categories = [
   { type: "activity", label: "Meal" },
@@ -16,13 +19,25 @@ const categories = [
   { type: "resource", label: "Others" },
 ];
 
+function LocationSelector({ setLocation }) {
+  const map = useMapEvents({
+    click(e) {
+      const { lat, lng } = e.latlng;
+      setLocation(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+    },
+  });
+  return null;
+}
+
 export default function CreateModal({ onClose }) {
   const [step, setStep] = useState(1);
   const [selected, setSelected] = useState(null);
   const [formData, setFormData] = useState({
+    title: "",
     time: "",
     location: "",
     price: "",
+    unit: "USD",
     description: "",
     photos: [],
   });
@@ -101,26 +116,61 @@ export default function CreateModal({ onClose }) {
         {step === 2 && (
           <div className="space-y-3">
             <input
-              name="time"
+              name="title"
               type="text"
-              placeholder="Time"
+              placeholder="Title"
               onChange={handleInput}
               className="w-full border px-3 py-2 rounded-md"
             />
+            <input
+              name="time"
+              type="datetime-local"
+              onChange={handleInput}
+              className="w-full border px-3 py-2 rounded-md"
+            />
+            <div className="w-full h-40 rounded-md overflow-hidden">
+              <MapContainer
+                center={[25.033, 121.5654]}
+                zoom={13}
+                style={{ height: "100%", width: "100%" }}
+              >
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <LocationSelector setLocation={(loc) => setFormData({ ...formData, location: loc })} />
+                {formData.location && (
+                  <Marker
+                    position={formData.location.split(", ").map(Number)}
+                    icon={L.icon({ iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png", shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png" })}
+                  />
+                )}
+              </MapContainer>
+            </div>
             <input
               name="location"
               type="text"
               placeholder="Location"
+              value={formData.location}
               onChange={handleInput}
               className="w-full border px-3 py-2 rounded-md"
             />
-            <input
-              name="price"
-              type="text"
-              placeholder="Price"
-              onChange={handleInput}
-              className="w-full border px-3 py-2 rounded-md"
-            />
+            <div className="flex gap-2">
+              <select
+                name="unit"
+                value={formData.unit}
+                onChange={handleInput}
+                className="border px-3 py-2 rounded-md"
+              >
+                <option value="USD">$</option>
+                <option value="Bound">Bound</option>
+                <option value="Free">Free</option>
+              </select>
+              <input
+                name="price"
+                type="number"
+                placeholder="Amount"
+                onChange={handleInput}
+                className="flex-1 border px-3 py-2 rounded-md"
+              />
+            </div>
             <textarea
               name="description"
               placeholder="Description"
@@ -130,9 +180,20 @@ export default function CreateModal({ onClose }) {
             <input
               type="file"
               multiple
+              accept="image/*"
               onChange={handlePhotoUpload}
               className="w-full"
             />
+            <div className="flex gap-2 overflow-x-auto">
+              {formData.photos.map((file, i) => (
+                <img
+                  key={i}
+                  src={URL.createObjectURL(file)}
+                  alt="preview"
+                  className="h-20 w-20 object-cover rounded-md border"
+                />
+              ))}
+            </div>
             <div className="pt-2 flex justify-end">
               <button
                 onClick={handleSubmit}
