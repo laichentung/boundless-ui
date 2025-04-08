@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { MapContainer, TileLayer, useMapEvents, Marker } from "react-leaflet";
+import { useEffect, useState } from "react";
+import { MapContainer, TileLayer, useMapEvents, Marker, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -20,22 +20,36 @@ const categories = [
 ];
 
 function LocationSelector({ setLocation }) {
-  const map = useMapEvents({
+  useMapEvents({
     click(e) {
       const { lat, lng } = e.latlng;
-      setLocation(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+      setLocation([lat, lng]);
     },
   });
+  return null;
+}
+
+function CenterOnCurrentLocation({ setLocation }) {
+  const map = useMap();
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const coords = [pos.coords.latitude, pos.coords.longitude];
+        setLocation(coords);
+        map.setView(coords, 15);
+      });
+    }
+  }, [map, setLocation]);
   return null;
 }
 
 export default function CreateModal({ onClose }) {
   const [step, setStep] = useState(1);
   const [selected, setSelected] = useState(null);
+  const [location, setLocation] = useState(null);
   const [formData, setFormData] = useState({
     title: "",
     time: "",
-    location: "",
     price: "",
     unit: "USD",
     description: "",
@@ -55,6 +69,7 @@ export default function CreateModal({ onClose }) {
   const handleSubmit = () => {
     const activity = {
       ...formData,
+      location,
       ...selected,
     };
     console.log("Activity created:", activity);
@@ -122,36 +137,46 @@ export default function CreateModal({ onClose }) {
               onChange={handleInput}
               className="w-full border px-3 py-2 rounded-md"
             />
+            <label className="text-sm text-gray-500">Time</label>
             <input
               name="time"
               type="datetime-local"
               onChange={handleInput}
               className="w-full border px-3 py-2 rounded-md"
             />
-            <div className="w-full h-40 rounded-md overflow-hidden">
+            <div className="w-full h-56 rounded-md overflow-hidden">
               <MapContainer
                 center={[25.033, 121.5654]}
-                zoom={13}
+                zoom={14}
                 style={{ height: "100%", width: "100%" }}
               >
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                <LocationSelector setLocation={(loc) => setFormData({ ...formData, location: loc })} />
-                {formData.location && (
+                <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+                <LocationSelector setLocation={setLocation} />
+                <CenterOnCurrentLocation setLocation={setLocation} />
+                {location && (
                   <Marker
-                    position={formData.location.split(", ").map(Number)}
-                    icon={L.icon({ iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png", shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png" })}
+                    position={location}
+                    icon={L.icon({
+                      iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+                      shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+                    })}
                   />
                 )}
               </MapContainer>
             </div>
-            <input
-              name="location"
-              type="text"
-              placeholder="Location"
-              value={formData.location}
-              onChange={handleInput}
-              className="w-full border px-3 py-2 rounded-md"
-            />
+            <button
+              onClick={() => {
+                if (navigator.geolocation) {
+                  navigator.geolocation.getCurrentPosition((pos) => {
+                    const coords = [pos.coords.latitude, pos.coords.longitude];
+                    setLocation(coords);
+                  });
+                }
+              }}
+              className="text-sm text-blue-500 underline"
+            >
+              Use Current Location
+            </button>
             <div className="flex gap-2">
               <select
                 name="unit"
@@ -168,7 +193,8 @@ export default function CreateModal({ onClose }) {
                 type="number"
                 placeholder="Amount"
                 onChange={handleInput}
-                className="flex-1 border px-3 py-2 rounded-md"
+                disabled={formData.unit === "Free"}
+                className="flex-1 border px-3 py-2 rounded-md bg-white disabled:bg-gray-100"
               />
             </div>
             <textarea
