@@ -58,19 +58,41 @@ export default function CreateModal({ onClose }) {
         </div>
 
         {step === 1 && (
-          <div className="grid grid-cols-2 gap-3">
-            {categories.map((item) => (
-              <button
-                key={item.label}
-                onClick={() => {
-                  setSelected(item);
-                  setStep(2);
-                }}
-                className="p-3 rounded-xl border border-gray-300 hover:border-black hover:bg-gray-50 text-sm capitalize"
-              >
-                {item.label}
-              </button>
-            ))}
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-500 mb-2">Service / Activity</h3>
+              <div className="grid grid-cols-2 gap-3">
+                {categories.filter(c => c.type === "activity").map((item) => (
+                  <button
+                    key={item.label}
+                    onClick={() => {
+                      setSelected(item);
+                      setStep(2);
+                    }}
+                    className="p-3 rounded-xl border border-gray-300 hover:border-black hover:bg-gray-50 text-sm capitalize"
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-500 mb-2">Resource</h3>
+              <div className="grid grid-cols-2 gap-3">
+                {categories.filter(c => c.type === "resource").map((item) => (
+                  <button
+                    key={item.label}
+                    onClick={() => {
+                      setSelected(item);
+                      setStep(2);
+                    }}
+                    className="p-3 rounded-xl border border-gray-300 hover:border-black hover:bg-gray-50 text-sm capitalize"
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
