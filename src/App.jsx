@@ -20,6 +20,7 @@ import {
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import { supabase } from "../lib/supabase";
 import CreateModal from "./components/CreateModal";
 
 // Fix Leaflet icon
@@ -30,6 +31,14 @@ L.Icon.Default.mergeOptions({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
+        {activities.map((act) => (
+          <Marker key={act.id} position={[act.latitude, act.longitude]}>
+            <Popup>
+              <strong>{act.title}</strong><br />
+              {act.time_start?.slice(0, 16).replace("T", " ")}
+            </Popup>
+          </Marker>
+        ))}
 
 function CurrentLocationMarker({ onLocate, setMap }) {
   const [position, setPosition] = useState(null);
@@ -37,6 +46,16 @@ function CurrentLocationMarker({ onLocate, setMap }) {
   const map = useMap();
 
   useEffect(() => {
+  useEffect(() => {
+    const fetchActivities = async () => {
+      const { data, error } = await supabase.from("activities").select("*");
+      if (error) {
+        console.error("❌ Failed to fetch activities:", error.message);
+      } else {
+        setActivities(data);
+      }
+    };
+    fetchActivities();
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -152,6 +171,14 @@ export default function App() {
                 onClick={() => {
                   if (mapRef && mapCenter) {
                     mapRef.setView(mapCenter, 15);
+        {activities.map((act) => (
+          <Marker key={act.id} position={[act.latitude, act.longitude]}>
+            <Popup>
+              <strong>{act.title}</strong><br />
+              {act.time_start?.slice(0, 16).replace("T", " ")}
+            </Popup>
+          </Marker>
+        ))}
                   }
                 }}
               >
