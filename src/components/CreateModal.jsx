@@ -1,4 +1,6 @@
-// 回復上個穩定版本，移除 Google Maps 搜尋按鈕，並保留地圖輸入/定位功能
+// 更新時間欄位橫線與按鈕排版改回一列
+
+// 其餘原功能維持不變（地圖、位置輸入、發佈等）
 
 import { useEffect, useState, useRef } from "react";
 import { MapContainer, TileLayer, useMapEvents, Marker, useMap } from "react-leaflet";
@@ -143,14 +145,15 @@ export default function CreateModal({ onClose }) {
             <input name="title" type="text" placeholder="Title" onChange={handleInput} className="w-full border px-3 py-2 rounded-md" />
 
             <label className="block text-sm font-semibold text-gray-600">Time</label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <input name="timeStart" type="datetime-local" onChange={handleInput} className="w-full border px-3 py-2 rounded-md" />
+              <span className="text-gray-500">-</span>
               <input name="timeEnd" type="datetime-local" onChange={handleInput} className="w-full border px-3 py-2 rounded-md" />
             </div>
 
             <label className="block text-sm font-semibold text-gray-600">Location</label>
             <input type="text" value={inputLocation} onChange={(e) => setInputLocation(e.target.value)} placeholder="Enter coordinates or Google Maps link" className="w-full px-3 py-2 border rounded-md" />
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2">
               <button onClick={handleLocationInput} className="px-3 py-1 text-sm border rounded-md bg-white">Set Location</button>
               <button onClick={recenter} className="px-3 py-1 text-sm border rounded-md bg-white">📍 Use My Current Location</button>
             </div>
