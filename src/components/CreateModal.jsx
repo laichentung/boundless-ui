@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { MapContainer, TileLayer, useMapEvents, Marker, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+
+const MAPBOX_TOKEN = "pk.eyJ1IjoiYnJpYW4tbGFpIiwiYSI6ImNtOTlkazNtaTBjN3Yyam9vNXAydm9hdTkifQ.MizQ_5fggvWX0OWuwiRHWw";
 
 const categories = [
   { type: "activity", label: "Meal" },
@@ -19,10 +21,12 @@ const categories = [
   { type: "resource", label: "Others" },
 ];
 
-function LocationSelector({ setLocation }) {
-  const map = useMapEvents({
+function LocationSelector({ setLocation, setClickMarker }) {
+  useMapEvents({
     click(e) {
-      setLocation([e.latlng.lat, e.latlng.lng]);
+      const { lat, lng } = e.latlng;
+      setLocation([lat, lng]);
+      setClickMarker([lat, lng]);
     },
   });
   return null;
@@ -46,7 +50,9 @@ export default function CreateModal({ onClose }) {
   const [step, setStep] = useState(1);
   const [selected, setSelected] = useState(null);
   const [location, setLocation] = useState(null);
+  const [clickMarker, setClickMarker] = useState(null);
   const [address, setAddress] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
   const [formData, setFormData] = useState({
     title: "",
     timeStart: "",
@@ -67,16 +73,19 @@ export default function CreateModal({ onClose }) {
     setFormData({ ...formData, photos: files });
   };
 
-  const handleAddressSearch = async () => {
-    const query = encodeURIComponent(address);
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`
-    );
+  const handleAddressSearch = async (text) => {
+    setAddress(text);
+    if (!text) return;
+    const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(text)}.json?access_token=${MAPBOX_TOKEN}&autocomplete=true&limit=5&language=zh`);
     const data = await res.json();
-    if (data && data.length > 0) {
-      const { lat, lon } = data[0];
-      setLocation([parseFloat(lat), parseFloat(lon)]);
-    }
+    setSuggestions(data.features || []);
+  };
+
+  const handleSelectSuggestion = (place) => {
+    const [lng, lat] = place.center;
+    setLocation([lat, lng]);
+    setAddress(place.place_name);
+    setSuggestions([]);
   };
 
   const handleSubmit = () => {
@@ -88,6 +97,19 @@ export default function CreateModal({ onClose }) {
     };
     console.log("Activity created:", activity);
     onClose();
+  };
+
+  const mapRef = useRef();
+  const recenter = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const coords = [pos.coords.latitude, pos.coords.longitude];
+        setLocation(coords);
+        if (mapRef.current) {
+          mapRef.current.setView(coords, 15);
+        }
+      });
+    }
   };
 
   return (
@@ -172,19 +194,32 @@ export default function CreateModal({ onClose }) {
               type="text"
               placeholder="Search address..."
               value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              onBlur={handleAddressSearch}
+              onChange={(e) => handleAddressSearch(e.target.value)}
               className="w-full border px-3 py-2 rounded-md"
             />
+            {suggestions.length > 0 && (
+              <ul className="border rounded-md p-2 bg-white text-sm space-y-1">
+                {suggestions.map((place) => (
+                  <li
+                    key={place.id}
+                    onClick={() => handleSelectSuggestion(place)}
+                    className="cursor-pointer hover:bg-gray-100 px-2 py-1"
+                  >
+                    {place.place_name}
+                  </li>
+                ))}
+              </ul>
+            )}
 
-            <div className="w-full h-56 rounded-md overflow-hidden">
+            <div className="relative w-full h-56 rounded-md overflow-hidden">
               <MapContainer
+                ref={mapRef}
                 center={[25.033, 121.5654]}
                 zoom={14}
                 style={{ height: "100%", width: "100%" }}
               >
-                <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
-                <LocationSelector setLocation={setLocation} />
+                <TileLayer url={`https://api.mapbox.com/styles/v1/mapbox/light-v11/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`} tileSize={512} zoomOffset={-1} />
+                <LocationSelector setLocation={setLocation} setClickMarker={setClickMarker} />
                 <CenterOnCurrentLocation setLocation={setLocation} />
                 {location && (
                   <Marker
@@ -196,20 +231,17 @@ export default function CreateModal({ onClose }) {
                   />
                 )}
               </MapContainer>
+              <button
+                onClick={recenter}
+                className="absolute bottom-2 right-2 z-[999] bg-white border shadow px-3 py-1 rounded-full text-sm"
+              >
+                📍
+              </button>
             </div>
-            <button
-              onClick={() => {
-                if (navigator.geolocation) {
-                  navigator.geolocation.getCurrentPosition((pos) => {
-                    const coords = [pos.coords.latitude, pos.coords.longitude];
-                    setLocation(coords);
-                  });
-                }
-              }}
-              className="text-sm mt-1 px-3 py-2 border rounded-md text-black hover:bg-gray-100"
-            >
-              📍 Use My Current Location
-            </button>
+
+            {clickMarker && (
+              <p className="text-xs text-gray-400">Marker at: {clickMarker[0].toFixed(5)}, {clickMarker[1].toFixed(5)}</p>
+            )}
 
             <label className="block text-sm font-semibold text-gray-600">Price</label>
             <div className="flex gap-2">
