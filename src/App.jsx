@@ -32,7 +32,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-function CurrentLocationMarker({ onLocate, setMap }) {
+function CurrentLocationMarker({ onLocate, setMap, setActivities }) {
   const [position, setPosition] = useState(null);
   const [error, setError] = useState(null);
   const map = useMap();
