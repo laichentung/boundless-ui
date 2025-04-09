@@ -133,7 +133,7 @@ export default function App() {
                 attribution='&copy; Carto'
                 url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
               />
-              <CurrentLocationMarker onLocate={setMapCenter} setMap={setMapRef} />
+              <CurrentLocationMarker onLocate={setMapCenter} setMap={setMapRef} setActivities={setActivities} />
             
         {activities.map((act) => (
           <Marker
