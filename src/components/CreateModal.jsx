@@ -1,11 +1,16 @@
-// 更新時間欄位橫線與按鈕排版改回一列
+// ✅ 類別清單放在最上方，方便修改
+const activityCategories = [
+  "Meal", "Ride", "Meet-up", "Entertainment",
+  "Relaxation", "Learning", "Help", "Others",
+];
 
-// 其餘原功能維持不變（地圖、位置輸入、發佈等）
+const resourceCategories = [
+  "Food / Drinks", "Items", "Clothing", "Space", "Parking", "Others",
+];
 
 import { useEffect, useState, useRef } from "react";
 import { MapContainer, TileLayer, useMapEvents, Marker, useMap } from "react-leaflet";
 import L from "leaflet";
-import { Crosshair } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 
 function LocationSelector({ setLocation }) {
@@ -83,7 +88,7 @@ export default function CreateModal({ onClose }) {
       setLocation([lat, lng]);
       if (mapRef.current) mapRef.current.setView([lat, lng], 15);
     } else {
-      alert("⚠️ 請輸入有效的經緯度，或是包含座標的 Google Maps 連結（網址中含 @ 或 ?ll=）。");
+      alert("⚠️ 請輸入有效的經緯度或含座標的 Google Maps 連結。");
     }
   };
 
@@ -121,7 +126,7 @@ export default function CreateModal({ onClose }) {
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-gray-500 mb-2">Service / Activity</h3>
             <div className="grid grid-cols-2 gap-3">
-              {["Meal","Ride","Meet-up","Help","Relaxation","Entertainment","Others"].map(label => (
+              {activityCategories.map(label => (
                 <button key={label} onClick={() => { setSelected({ type: "activity", label }); setStep(2); }}
                   className="p-3 rounded-xl border border-gray-300 hover:border-black hover:bg-gray-50 text-sm capitalize">
                   {label}
@@ -130,7 +135,7 @@ export default function CreateModal({ onClose }) {
             </div>
             <h3 className="text-sm font-semibold text-gray-500 mb-2">Resource</h3>
             <div className="grid grid-cols-2 gap-3">
-              {["Space","Parking","Food / Drinks","Items","Clothing","Others"].map(label => (
+              {resourceCategories.map(label => (
                 <button key={label} onClick={() => { setSelected({ type: "resource", label }); setStep(2); }}
                   className="p-3 rounded-xl border border-gray-300 hover:border-black hover:bg-gray-50 text-sm capitalize">
                   {label}
@@ -142,24 +147,34 @@ export default function CreateModal({ onClose }) {
 
         {step === 2 && (
           <div className="space-y-3">
-            <input name="title" type="text" placeholder="Title" onChange={handleInput} className="w-full border px-3 py-2 rounded-md" />
+            <input name="title" type="text" placeholder="Title"
+              onChange={handleInput} className="w-full border px-3 py-2 rounded-md" />
 
             <label className="block text-sm font-semibold text-gray-600">Time</label>
             <div className="flex gap-2 items-center">
-              <input name="timeStart" type="datetime-local" onChange={handleInput} className="w-full border px-3 py-2 rounded-md" />
+              <input name="timeStart" type="datetime-local" onChange={handleInput}
+                className="w-full border px-3 py-2 rounded-md" />
               <span className="text-gray-500">-</span>
-              <input name="timeEnd" type="datetime-local" onChange={handleInput} className="w-full border px-3 py-2 rounded-md" />
+              <input name="timeEnd" type="datetime-local" onChange={handleInput}
+                className="w-full border px-3 py-2 rounded-md" />
             </div>
 
             <label className="block text-sm font-semibold text-gray-600">Location</label>
-            <input type="text" value={inputLocation} onChange={(e) => setInputLocation(e.target.value)} placeholder="Enter coordinates or Google Maps link" className="w-full px-3 py-2 border rounded-md" />
+            <input type="text" value={inputLocation} onChange={(e) => setInputLocation(e.target.value)}
+              placeholder="Enter coordinates or Google Maps link"
+              className="w-full px-3 py-2 border rounded-md" />
             <div className="flex gap-2">
-              <button onClick={handleLocationInput} className="px-3 py-1 text-sm border rounded-md bg-white">Set Location</button>
-              <button onClick={recenter} className="px-3 py-1 text-sm border rounded-md bg-white">📍 Use My Current Location</button>
+              <button onClick={handleLocationInput} className="px-3 py-1 text-sm border rounded-md bg-white">
+                Set Location
+              </button>
+              <button onClick={recenter} className="px-3 py-1 text-sm border rounded-md bg-white">
+                📍 Use My Current Location
+              </button>
             </div>
 
             <div className="relative w-full h-56 rounded-md overflow-hidden">
-              <MapContainer ref={mapRef} center={[25.033, 121.5654]} zoom={14} style={{ height: "100%", width: "100%" }} attributionControl={false}>
+              <MapContainer ref={mapRef} center={[25.033, 121.5654]} zoom={14}
+                style={{ height: "100%", width: "100%" }} attributionControl={false}>
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="" />
                 <LocationSelector setLocation={setLocation} />
                 <CenterOnCurrentLocation setLocation={setLocation} />
@@ -174,24 +189,31 @@ export default function CreateModal({ onClose }) {
 
             <label className="block text-sm font-semibold text-gray-600">Price</label>
             <div className="flex gap-2">
-              <select name="unit" value={formData.unit} onChange={handleInput} className="border px-3 py-2 rounded-md">
+              <select name="unit" value={formData.unit} onChange={handleInput}
+                className="border px-3 py-2 rounded-md">
                 <option value="USD">$</option>
                 <option value="Bound">Bound</option>
                 <option value="Free">Free</option>
               </select>
-              <input name="price" type="number" placeholder="Amount" onChange={handleInput} disabled={formData.unit === "Free"} className="flex-1 border px-3 py-2 rounded-md bg-white disabled:bg-gray-100" />
+              <input name="price" type="number" placeholder="Amount" onChange={handleInput}
+                disabled={formData.unit === "Free"}
+                className="flex-1 border px-3 py-2 rounded-md bg-white disabled:bg-gray-100" />
             </div>
 
-            <textarea name="description" placeholder="Description" onChange={handleInput} className="w-full border px-3 py-2 rounded-md" />
+            <textarea name="description" placeholder="Description" onChange={handleInput}
+              className="w-full border px-3 py-2 rounded-md" />
             <input type="file" multiple accept="image/*" onChange={handlePhotoUpload} className="w-full" />
             <div className="flex gap-2 overflow-x-auto">
               {formData.photos.map((file, i) => (
-                <img key={i} src={URL.createObjectURL(file)} alt="preview" className="h-20 w-20 object-cover rounded-md border" />
+                <img key={i} src={URL.createObjectURL(file)} alt="preview"
+                  className="h-20 w-20 object-cover rounded-md border" />
               ))}
             </div>
 
             <div className="pt-2 flex justify-end">
-              <button onClick={handleSubmit} className="bg-black text-white px-4 py-2 rounded-md">Publish</button>
+              <button onClick={handleSubmit} className="bg-black text-white px-4 py-2 rounded-md">
+                Publish
+              </button>
             </div>
           </div>
         )}
