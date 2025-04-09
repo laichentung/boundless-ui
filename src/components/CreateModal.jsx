@@ -1,3 +1,4 @@
+
 // 類別清單
 const activityCategories = [
   "Meal", "Ride", "Meet-up", "Entertainment",
@@ -29,212 +30,184 @@ function CenterOnCurrentLocation({ setLocation }) {
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((pos) => {
-        const coords = [pos.coords.latitude, pos.coords.longitude];
-        setLocation(coords);
-        map.setView(coords, 15);
+        const { latitude, longitude } = pos.coords;
+        setLocation([latitude, longitude]);
+        map.setView([latitude, longitude], 15);
       });
     }
-  }, [map, setLocation]);
+  }, []);
   return null;
 }
 
 export default function CreateModal({ onClose }) {
-  const [step, setStep] = useState(1);
-  const [selected, setSelected] = useState(null);
-  const [location, setLocation] = useState(null);
-  const [inputLocation, setInputLocation] = useState("");
-  const mapRef = useRef();
-
+  const [title, setTitle] = useState("");
+  const [selected, setSelected] = useState({ type: "activity", label: "Meal" });
   const [formData, setFormData] = useState({
-    title: "",
     timeStart: "",
     timeEnd: "",
     price: "",
-    unit: "USD",
-    description: "",
-    photos: [],
+    unit: "Free",
   });
+  const [location, setLocation] = useState([25.033, 121.5654]);
 
-  const handleInput = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-  };
+  const [image, setImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
-  const handlePhotoUpload = (e) => {
-    const files = Array.from(e.target.files);
-    setFormData({ ...formData, photos: files });
-  };
+  const mapRef = useRef();
 
-  const handleLocationInput = () => {
-    if (!inputLocation) return;
-    const latLngMatch = inputLocation.match(/(-?[\d.]+)[,\s]+(-?[\d.]+)/);
-    const atMatch = inputLocation.match(/@(-?[\d.]+),(-?[\d.]+)/);
-    const queryMatch = inputLocation.match(/[?&](q|ll)=(-?[\d.]+),(-?[\d.]+)/);
-
-    let lat = null;
-    let lng = null;
-
-    if (latLngMatch) {
-      lat = parseFloat(latLngMatch[1]);
-      lng = parseFloat(latLngMatch[2]);
-    } else if (atMatch) {
-      lat = parseFloat(atMatch[1]);
-      lng = parseFloat(atMatch[2]);
-    } else if (queryMatch) {
-      lat = parseFloat(queryMatch[2]);
-      lng = parseFloat(queryMatch[3]);
-    }
-
-    if (lat && lng) {
-      setLocation([lat, lng]);
-      if (mapRef.current) mapRef.current.setView([lat, lng], 15);
-    } else {
-      alert("⚠️ 請輸入有效的經緯度或含座標的 Google Maps 連結。");
-    }
-  };
-
-  const recenter = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        const coords = [pos.coords.latitude, pos.coords.longitude];
-        setLocation(coords);
-        if (mapRef.current) mapRef.current.setView(coords, 15);
-      });
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImage(file);
+      setImagePreview(URL.createObjectURL(file));
     }
   };
 
   const handleSubmit = async () => {
+    setUploading(true);
+    let photoUrls = [];
+
+    if (image) {
+      const filename = `${Date.now()}_${image.name}`;
+      const { data, error } = await supabase.storage
+        .from("activity-photos")
+        .upload(filename, image);
+
+      if (!error) {
+        const { data: urlData } = supabase.storage
+          .from("activity-photos")
+          .getPublicUrl(filename);
+        photoUrls.push(urlData.publicUrl);
+      }
+    }
+
     const activity = {
-      title: formData.title,
-      description: formData.description,
-      type: selected?.type,
-      category: selected?.label,
-      latitude: location?.[0],
-      longitude: location?.[1],
+      title,
+      category: selected.label,
+      type: selected.type,
       time_start: formData.timeStart,
       time_end: formData.timeEnd,
       price: formData.unit === "Free" ? 0 : parseFloat(formData.price),
       unit: formData.unit,
-      photos: [],
+      latitude: location[0],
+      longitude: location[1],
+      photos: photoUrls,
     };
-    console.log("Submitting activity:", activity);
-    const { data, error } = await supabase.from("activities").insert([activity]).select();
-    console.log("Supabase 回應：", { data, error });
 
-    if (error) {
-      alert("❌ 發佈失敗：" + error.message);
-    } else {
-      alert("✅ 發佈成功！");
+    const { error } = await supabase.from("activities").insert([activity]);
+
+    setUploading(false);
+    if (!error) {
       onClose();
+    } else {
+      console.error("Insert failed", error);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white w-[90%] max-w-md rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center">
-          <h2 className="text-lg font-semibold">
-            {step === 1 ? "I want to share..." : "Shared Details"}
-          </h2>
-          <button onClick={onClose} className="text-sm text-gray-400 hover:text-black">✕</button>
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
+      <div className="bg-white rounded-xl p-4 w-full max-w-md max-h-[95vh] overflow-y-auto">
+        <h2 className="text-xl font-semibold mb-4">I want to share...</h2>
+
+        <div className="mb-4">
+          <div className="flex flex-wrap gap-2 mb-2">
+            <button
+              className={`px-3 py-1 rounded-full border ${selected.type === "activity" ? "bg-black text-white" : ""}`}
+              onClick={() => setSelected({ type: "activity", label: "Meal" })}
+            >
+              Activity
+            </button>
+            <button
+              className={`px-3 py-1 rounded-full border ${selected.type === "resource" ? "bg-black text-white" : ""}`}
+              onClick={() => setSelected({ type: "resource", label: "Food / Drinks" })}
+            >
+              Resource
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {(selected.type === "activity" ? activityCategories : resourceCategories).map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelected({ ...selected, label: cat })}
+                className={`border px-3 py-2 rounded-lg text-sm ${selected.label === cat ? "bg-black text-white" : ""}`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {step === 1 && (
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-gray-500 mb-2">Service / Activity</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {activityCategories.map(label => (
-                <button key={label} onClick={() => { setSelected({ type: "activity", label }); setStep(2); }}
-                  className="p-3 rounded-xl border border-gray-300 hover:border-black hover:bg-gray-50 text-sm capitalize">
-                  {label}
-                </button>
-              ))}
-            </div>
-            <h3 className="text-sm font-semibold text-gray-500 mb-2">Resource</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {resourceCategories.map(label => (
-                <button key={label} onClick={() => { setSelected({ type: "resource", label }); setStep(2); }}
-                  className="p-3 rounded-xl border border-gray-300 hover:border-black hover:bg-gray-50 text-sm capitalize">
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        <input
+          type="text"
+          placeholder="Title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="border p-2 w-full mb-2"
+        />
 
-        {step === 2 && (
-          <div className="space-y-3">
-            <input name="title" type="text" placeholder="Title"
-              onChange={handleInput} className="w-full border px-3 py-2 rounded-md" />
+        <label className="text-sm text-gray-500">Time</label>
+        <div className="flex gap-2 mb-2">
+          <input
+            type="datetime-local"
+            className="border p-2 flex-1"
+            value={formData.timeStart}
+            onChange={(e) => setFormData({ ...formData, timeStart: e.target.value })}
+          />
+          <span className="self-center">-</span>
+          <input
+            type="datetime-local"
+            className="border p-2 flex-1"
+            value={formData.timeEnd}
+            onChange={(e) => setFormData({ ...formData, timeEnd: e.target.value })}
+          />
+        </div>
 
-            <label className="block text-sm font-semibold text-gray-600">Time</label>
-            <div className="flex gap-2 items-center">
-              <input name="timeStart" type="datetime-local" onChange={handleInput}
-                className="w-full border px-3 py-2 rounded-md" />
-              <span className="text-gray-500">-</span>
-              <input name="timeEnd" type="datetime-local" onChange={handleInput}
-                className="w-full border px-3 py-2 rounded-md" />
-            </div>
+        <label className="text-sm text-gray-500">Photo</label>
+        <input type="file" accept="image/*" onChange={handleImageChange} className="mb-2" />
+        {imagePreview && <img src={imagePreview} alt="preview" className="mb-2 rounded-lg" />}
 
-            <label className="block text-sm font-semibold text-gray-600">Location</label>
-            <button onClick={recenter} className="mb-2 text-sm px-3 py-1 border rounded-md bg-white w-full">
-              📍 Use My Current Location
-            </button>
-            <div className="flex gap-2">
-              <input type="text" value={inputLocation} onChange={(e) => setInputLocation(e.target.value)}
-                placeholder="Enter coordinates or Google Maps link"
-                className="flex-1 px-3 py-2 border rounded-md" />
-              <button onClick={handleLocationInput}
-                className="px-3 py-2 text-sm border rounded-md bg-white whitespace-nowrap">
-                Set
-              </button>
-            </div>
+        <label className="text-sm text-gray-500">Location</label>
+        <div className="h-48 rounded-lg overflow-hidden mb-2">
+          <MapContainer center={location} zoom={14} className="h-full w-full z-0" ref={mapRef}>
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <LocationSelector setLocation={setLocation} />
+            <CenterOnCurrentLocation setLocation={setLocation} />
+            <Marker position={location} />
+          </MapContainer>
+        </div>
 
-            <div className="relative w-full h-56 rounded-md overflow-hidden">
-              <MapContainer ref={mapRef} center={[25.033, 121.5654]} zoom={14}
-                style={{ height: "100%", width: "100%" }} attributionControl={false}>
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="" />
-                <LocationSelector setLocation={setLocation} />
-                <CenterOnCurrentLocation setLocation={setLocation} />
-                {location && (
-                  <Marker position={location} icon={L.icon({
-                    iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-                    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-                  })} />
-                )}
-              </MapContainer>
-            </div>
+        <label className="text-sm text-gray-500">Price</label>
+        <div className="flex gap-2 mb-4">
+          <select
+            className="border p-2"
+            value={formData.unit}
+            onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+          >
+            <option>Free</option>
+            <option>USD</option>
+            <option>TWD</option>
+          </select>
+          <input
+            type="number"
+            className="border p-2 flex-1"
+            value={formData.price}
+            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+            disabled={formData.unit === "Free"}
+          />
+        </div>
 
-            <label className="block text-sm font-semibold text-gray-600">Price</label>
-            <div className="flex gap-2">
-              <select name="unit" value={formData.unit} onChange={handleInput}
-                className="border px-3 py-2 rounded-md">
-                <option value="USD">$</option>
-                <option value="Bound">Bound</option>
-                <option value="Free">Free</option>
-              </select>
-              <input name="price" type="number" placeholder="Amount" onChange={handleInput}
-                disabled={formData.unit === "Free"}
-                className="flex-1 border px-3 py-2 rounded-md bg-white disabled:bg-gray-100" />
-            </div>
-
-            <textarea name="description" placeholder="Description" onChange={handleInput}
-              className="w-full border px-3 py-2 rounded-md" />
-            <input type="file" multiple accept="image/*" onChange={handlePhotoUpload} className="w-full" />
-            <div className="flex gap-2 overflow-x-auto">
-              {formData.photos.map((file, i) => (
-                <img key={i} src={URL.createObjectURL(file)} alt="preview"
-                  className="h-20 w-20 object-cover rounded-md border" />
-              ))}
-            </div>
-
-            <div className="pt-2 flex justify-end">
-              <button onClick={handleSubmit} className="bg-black text-white px-4 py-2 rounded-md">
-                Publish
-              </button>
-            </div>
-          </div>
-        )}
+        <div className="flex justify-between">
+          <button onClick={onClose} className="text-gray-600">Cancel</button>
+          <button
+            onClick={handleSubmit}
+            className="bg-black text-white px-4 py-2 rounded-full"
+            disabled={uploading}
+          >
+            {uploading ? "Publishing..." : "Publish"}
+          </button>
+        </div>
       </div>
     </div>
   );
