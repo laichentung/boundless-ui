@@ -1,4 +1,4 @@
-// ✅ 類別清單放在最上方，方便修改
+// 類別清單
 const activityCategories = [
   "Meal", "Ride", "Meet-up", "Entertainment",
   "Relaxation", "Learning", "Help", "Others",
@@ -10,6 +10,7 @@ const resourceCategories = [
 
 import { useEffect, useState, useRef } from "react";
 import { MapContainer, TileLayer, useMapEvents, Marker, useMap } from "react-leaflet";
+import { supabase } from "../lib/supabase";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -88,7 +89,7 @@ export default function CreateModal({ onClose }) {
       setLocation([lat, lng]);
       if (mapRef.current) mapRef.current.setView([lat, lng], 15);
     } else {
-      alert("⚠️ 請輸入有效的經緯度或含座標的 Google Maps 連結。\n格式例如：25.033,121.5654 或 @25.033,121.5654");
+      alert("⚠️ 請輸入有效的經緯度或含座標的 Google Maps 連結。");
     }
   };
 
@@ -102,14 +103,30 @@ export default function CreateModal({ onClose }) {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const activity = {
-      ...formData,
-      location,
-      ...selected,
+      title: formData.title,
+      description: formData.description,
+      type: selected?.type,
+      category: selected?.label,
+      latitude: location?.[0],
+      longitude: location?.[1],
+      time_start: formData.timeStart,
+      time_end: formData.timeEnd,
+      price: formData.unit === "Free" ? 0 : parseFloat(formData.price),
+      unit: formData.unit,
+      photos: [],
     };
-    console.log("Activity created:", activity);
-    onClose();
+    console.log("Submitting activity:", activity);
+    const { data, error } = await supabase.from("activities").insert([activity]);
+    console.log("Supabase 回應：", { data, error });
+
+    if (error) {
+      alert("❌ 發佈失敗：" + error.message);
+    } else {
+      alert("✅ 發佈成功！");
+      onClose();
+    }
   };
 
   return (
@@ -167,7 +184,8 @@ export default function CreateModal({ onClose }) {
               <input type="text" value={inputLocation} onChange={(e) => setInputLocation(e.target.value)}
                 placeholder="Enter coordinates or Google Maps link"
                 className="flex-1 px-3 py-2 border rounded-md" />
-              <button onClick={handleLocationInput} className="px-3 py-2 text-sm border rounded-md bg-white whitespace-nowrap">
+              <button onClick={handleLocationInput}
+                className="px-3 py-2 text-sm border rounded-md bg-white whitespace-nowrap">
                 Set
               </button>
             </div>
