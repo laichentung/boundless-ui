@@ -10,7 +10,7 @@ const resourceCategories = [
 
 import { useEffect, useState, useRef } from "react";
 import { MapContainer, TileLayer, useMapEvents, Marker, useMap } from "react-leaflet";
-import { supabase } from "../lib/supabase";
+import { supabase } from "../../lib/supabase";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
