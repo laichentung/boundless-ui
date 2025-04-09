@@ -11,7 +11,6 @@ const resourceCategories = [
 import { useEffect, useState, useRef } from "react";
 import { MapContainer, TileLayer, useMapEvents, Marker, useMap } from "react-leaflet";
 import { supabase } from "../../lib/supabase";
-import { v4 as uuidv4 } from 'uuid';
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -53,7 +52,7 @@ export default function CreateModal({ onClose }) {
     price: "",
     unit: "USD",
     description: "",
-      photos: photoUrls,
+    photos: [],
   });
 
   const handleInput = (e) => {
@@ -63,7 +62,7 @@ export default function CreateModal({ onClose }) {
 
   const handlePhotoUpload = (e) => {
     const files = Array.from(e.target.files);
-      photos: photoUrls,
+    setFormData({ ...formData, photos: files });
   };
 
   const handleLocationInput = () => {
@@ -105,21 +104,6 @@ export default function CreateModal({ onClose }) {
   };
 
   const handleSubmit = async () => {
-
-    let photoUrls = [];
-    if (image) {
-      const filename = `${Date.now()}_${image.name}`;
-      const { data, error } = await supabase.storage
-        .from("activity-photos")
-        .upload(filename, image);
-      if (!error) {
-        const { data: urlData } = supabase.storage
-          .from("activity-photos")
-          .getPublicUrl(filename);
-        photoUrls.push(urlData.publicUrl);
-      }
-    }
-
     const activity = {
       title: formData.title,
       description: formData.description,
@@ -131,7 +115,7 @@ export default function CreateModal({ onClose }) {
       time_end: formData.timeEnd,
       price: formData.unit === "Free" ? 0 : parseFloat(formData.price),
       unit: formData.unit,
-      photos: photoUrls,
+      photos: [],
     };
     console.log("Submitting activity:", activity);
     const { data, error } = await supabase.from("activities").insert([activity]).select();
