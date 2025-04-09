@@ -1,26 +1,10 @@
-// 完整 CreateModal（新增 Google Maps 搜尋按鈕）
+// 回復上個穩定版本，移除 Google Maps 搜尋按鈕，並保留地圖輸入/定位功能
 
 import { useEffect, useState, useRef } from "react";
 import { MapContainer, TileLayer, useMapEvents, Marker, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Crosshair } from "lucide-react";
 import "leaflet/dist/leaflet.css";
-
-const categories = [
-  { type: "activity", label: "Meal" },
-  { type: "activity", label: "Ride" },
-  { type: "activity", label: "Meet-up" },
-  { type: "activity", label: "Help" },
-  { type: "activity", label: "Relaxation" },
-  { type: "activity", label: "Entertainment" },
-  { type: "activity", label: "Others" },
-  { type: "resource", label: "Space" },
-  { type: "resource", label: "Parking" },
-  { type: "resource", label: "Food / Drinks" },
-  { type: "resource", label: "Items" },
-  { type: "resource", label: "Clothing" },
-  { type: "resource", label: "Others" },
-];
 
 function LocationSelector({ setLocation }) {
   useMapEvents({
@@ -97,14 +81,8 @@ export default function CreateModal({ onClose }) {
       setLocation([lat, lng]);
       if (mapRef.current) mapRef.current.setView([lat, lng], 15);
     } else {
-      alert("⚠️ 請輸入有效的經緯度或含座標的 Google 地圖連結。");
+      alert("⚠️ 請輸入有效的經緯度，或是包含座標的 Google Maps 連結（網址中含 @ 或 ?ll=）。");
     }
-  };
-
-  const openGoogleSearch = () => {
-    if (!inputLocation) return;
-    const url = `https://www.google.com/maps/search/${encodeURIComponent(inputLocation)}`;
-    window.open(url, "_blank");
   };
 
   const recenter = () => {
@@ -141,19 +119,19 @@ export default function CreateModal({ onClose }) {
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-gray-500 mb-2">Service / Activity</h3>
             <div className="grid grid-cols-2 gap-3">
-              {categories.filter(c => c.type === "activity").map((item) => (
-                <button key={item.label} onClick={() => { setSelected(item); setStep(2); }}
+              {["Meal","Ride","Meet-up","Help","Relaxation","Entertainment","Others"].map(label => (
+                <button key={label} onClick={() => { setSelected({ type: "activity", label }); setStep(2); }}
                   className="p-3 rounded-xl border border-gray-300 hover:border-black hover:bg-gray-50 text-sm capitalize">
-                  {item.label}
+                  {label}
                 </button>
               ))}
             </div>
             <h3 className="text-sm font-semibold text-gray-500 mb-2">Resource</h3>
             <div className="grid grid-cols-2 gap-3">
-              {categories.filter(c => c.type === "resource").map((item) => (
-                <button key={item.label} onClick={() => { setSelected(item); setStep(2); }}
+              {["Space","Parking","Food / Drinks","Items","Clothing","Others"].map(label => (
+                <button key={label} onClick={() => { setSelected({ type: "resource", label }); setStep(2); }}
                   className="p-3 rounded-xl border border-gray-300 hover:border-black hover:bg-gray-50 text-sm capitalize">
-                  {item.label}
+                  {label}
                 </button>
               ))}
             </div>
@@ -175,7 +153,6 @@ export default function CreateModal({ onClose }) {
             <div className="flex gap-2 flex-wrap">
               <button onClick={handleLocationInput} className="px-3 py-1 text-sm border rounded-md bg-white">Set Location</button>
               <button onClick={recenter} className="px-3 py-1 text-sm border rounded-md bg-white">📍 Use My Current Location</button>
-              <button onClick={openGoogleSearch} className="px-3 py-1 text-sm border rounded-md bg-white">🔎 Search on Google Maps</button>
             </div>
 
             <div className="relative w-full h-56 rounded-md overflow-hidden">
