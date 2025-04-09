@@ -88,7 +88,7 @@ export default function CreateModal({ onClose }) {
       setLocation([lat, lng]);
       if (mapRef.current) mapRef.current.setView([lat, lng], 15);
     } else {
-      alert("⚠️ 請輸入有效的經緯度或含座標的 Google Maps 連結。");
+      alert("⚠️ 請輸入有效的經緯度或含座標的 Google Maps 連結。\n格式例如：25.033,121.5654 或 @25.033,121.5654");
     }
   };
 
@@ -160,15 +160,15 @@ export default function CreateModal({ onClose }) {
             </div>
 
             <label className="block text-sm font-semibold text-gray-600">Location</label>
-            <input type="text" value={inputLocation} onChange={(e) => setInputLocation(e.target.value)}
-              placeholder="Enter coordinates or Google Maps link"
-              className="w-full px-3 py-2 border rounded-md" />
+            <button onClick={recenter} className="mb-2 text-sm px-3 py-1 border rounded-md bg-white w-full">
+              📍 Use My Current Location
+            </button>
             <div className="flex gap-2">
-              <button onClick={handleLocationInput} className="px-3 py-1 text-sm border rounded-md bg-white">
-                Set Location
-              </button>
-              <button onClick={recenter} className="px-3 py-1 text-sm border rounded-md bg-white">
-                📍 Use My Current Location
+              <input type="text" value={inputLocation} onChange={(e) => setInputLocation(e.target.value)}
+                placeholder="Enter coordinates or Google Maps link"
+                className="flex-1 px-3 py-2 border rounded-md" />
+              <button onClick={handleLocationInput} className="px-3 py-2 text-sm border rounded-md bg-white whitespace-nowrap">
+                Set
               </button>
             </div>
 
