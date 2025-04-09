@@ -20,8 +20,8 @@ import {
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { supabase } from "../lib/supabase";
 import CreateModal from "./components/CreateModal";
+import { supabase } from "../lib/supabase";
 
 // Fix Leaflet icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -31,21 +31,13 @@ L.Icon.Default.mergeOptions({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
-        {activities.map((act) => (
-          <Marker key={act.id} position={[act.latitude, act.longitude]}>
-            <Popup>
-              <strong>{act.title}</strong><br />
-              {act.time_start?.slice(0, 16).replace("T", " ")}
-            </Popup>
-          </Marker>
-        ))}
 
 function CurrentLocationMarker({ onLocate, setMap }) {
   const [position, setPosition] = useState(null);
   const [error, setError] = useState(null);
   const map = useMap();
 
-  useEffect(() => {
+  
   useEffect(() => {
     const fetchActivities = async () => {
       const { data, error } = await supabase.from("activities").select("*");
@@ -56,6 +48,9 @@ function CurrentLocationMarker({ onLocate, setMap }) {
       }
     };
     fetchActivities();
+  }, []);
+
+  useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -96,6 +91,7 @@ export default function App() {
   const [mode, setMode] = useState("map");
   const [mapCenter, setMapCenter] = useState([25.0340, 121.5623]);
   const [mapRef, setMapRef] = useState(null);
+  const [activities, setActivities] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
 
   return (
@@ -138,7 +134,25 @@ export default function App() {
                 url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
               />
               <CurrentLocationMarker onLocate={setMapCenter} setMap={setMapRef} />
-            </MapContainer>
+            
+        {activities.map((act) => (
+          <Marker
+            key={act.id}
+            position={[act.latitude, act.longitude]}
+            icon={L.icon({
+              iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+              shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+            })}
+          >
+            <Popup>
+              <strong>{act.title}</strong>
+              <br />
+              {act.time_start?.slice(0, 16).replace("T", " ")}
+            </Popup>
+          </Marker>
+        ))}
+
+      </MapContainer>
           ) : (
             <div className="p-4 space-y-4">
               <div className="bg-white rounded-xl shadow p-4">
@@ -171,14 +185,6 @@ export default function App() {
                 onClick={() => {
                   if (mapRef && mapCenter) {
                     mapRef.setView(mapCenter, 15);
-        {activities.map((act) => (
-          <Marker key={act.id} position={[act.latitude, act.longitude]}>
-            <Popup>
-              <strong>{act.title}</strong><br />
-              {act.time_start?.slice(0, 16).replace("T", " ")}
-            </Popup>
-          </Marker>
-        ))}
                   }
                 }}
               >
@@ -225,3 +231,6 @@ export default function App() {
     </div>
   );
 }
+
+
+export default App;
