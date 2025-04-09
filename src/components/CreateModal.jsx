@@ -118,7 +118,7 @@ export default function CreateModal({ onClose }) {
       photos: [],
     };
     console.log("Submitting activity:", activity);
-    const { data, error } = await supabase.from("activities").insert([activity]);
+    const { data, error } = await supabase.from("activities").insert([activity]).select();
     console.log("Supabase 回應：", { data, error });
 
     if (error) {
