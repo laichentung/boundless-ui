@@ -36,14 +36,35 @@ export default function CreateModal({ onClose }) {
   const [timeEnd, setTimeEnd] = useState("");
   const [price, setPrice] = useState("");
   const [unit, setUnit] = useState("Free");
-  const [location, setLocation] = useState([25.033, 121.5654]);
+  const [location, setLocation] = useState(null);
   const [address, setAddress] = useState("");
   const [images, setImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [showToast, setShowToast] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false);
 
   const mapRef = useRef();
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const coords = [pos.coords.latitude, pos.coords.longitude];
+          setLocation(coords);
+          if (mapRef.current) {
+            mapRef.current.setView(coords, 15);
+          }
+        },
+        (err) => {
+          console.error("Geolocation error:", err);
+          setLocation([25.033, 121.5654]);
+        }
+      );
+    } else {
+      setLocation([25.033, 121.5654]);
+    }
+  }, []);
 
   useEffect(() => {
     if (images.length) {
@@ -56,32 +77,55 @@ export default function CreateModal({ onClose }) {
 
   const useMyLocation = () => {
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        const coords = [pos.coords.latitude, pos.coords.longitude];
-        setLocation(coords);
-        if (mapRef.current) {
-          mapRef.current.setView(coords, 15);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const coords = [pos.coords.latitude, pos.coords.longitude];
+          setLocation(coords);
+          setIsUsingCurrentLocation(true);
+          if (mapRef.current) {
+            mapRef.current.setView(coords, 15);
+          }
+        },
+        (err) => {
+          console.error("Geolocation error:", err);
+          alert("Failed to get your location. Please try again.");
         }
-      });
+      );
     }
   };
 
   const setLocationFromAddress = () => {
+    if (!address) return;
+
     if (address.includes(",")) {
       const parts = address.split(",");
-      const lat = parseFloat(parts[0]);
-      const lng = parseFloat(parts[1]);
+      const lat = parseFloat(parts[0].trim());
+      const lng = parseFloat(parts[1].trim());
       if (!isNaN(lat) && !isNaN(lng)) {
         setLocation([lat, lng]);
+        setIsUsingCurrentLocation(false);
         if (mapRef.current) {
           mapRef.current.setView([lat, lng], 15);
         }
+        return;
+      }
+    }
+
+    const googleMapsRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const match = address.match(googleMapsRegex);
+    if (match) {
+      const lat = parseFloat(match[1]);
+      const lng = parseFloat(match[2]);
+      setLocation([lat, lng]);
+      setIsUsingCurrentLocation(false);
+      if (mapRef.current) {
+        mapRef.current.setView([lat, lng], 15);
       }
     }
   };
 
   const recenterMap = () => {
-    if (mapRef.current) {
+    if (mapRef.current && location) {
       mapRef.current.setView(location, 15);
     }
   };
@@ -96,7 +140,6 @@ export default function CreateModal({ onClose }) {
     try {
       let photoUrls = [];
 
-      // Upload images if any
       if (images.length > 0) {
         for (const image of images) {
           const filename = `${Date.now()}_${image.name}`;
@@ -113,7 +156,6 @@ export default function CreateModal({ onClose }) {
         }
       }
 
-      // Insert activity
       const { error } = await supabase.from("activities").insert([
         {
           title,
@@ -144,6 +186,10 @@ export default function CreateModal({ onClose }) {
       setIsSubmitting(false);
     }
   };
+
+  if (!location) {
+    return <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">Loading...</div>;
+  }
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
@@ -197,29 +243,34 @@ export default function CreateModal({ onClose }) {
           />
         </div>
 
-        <label className="text-sm text-gray-500">Address or Coordinates</label>
-        <div className="flex gap-2 mb-2">
-          <input
-            type="text"
-            placeholder="Paste Google Maps link, address, or coordinates"
-            className="border p-2 flex-1"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-          />
+        <label className="text-sm text-gray-500">Location</label>
+        <div className="flex flex-col gap-2 mb-2">
           <button
-            onClick={setLocationFromAddress}
-            className="bg-black text-white px-3 py-2 rounded"
+            onClick={useMyLocation}
+            className={`p-2 rounded border ${
+              isUsingCurrentLocation
+                ? "bg-black text-white"
+                : "bg-white text-black"
+            }`}
           >
-            Set
+            Use My Current Location
           </button>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Paste coordinates or Google Maps link"
+              className="border p-2 flex-1"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+            <button
+              onClick={setLocationFromAddress}
+              className="bg-black text-white px-3 py-2 rounded"
+            >
+              Set
+            </button>
+          </div>
         </div>
-
-        <button
-          onClick={useMyLocation}
-          className="text-sm underline text-blue-600 mb-1"
-        >
-          Use My Current Location
-        </button>
 
         <div className="h-48 rounded-lg overflow-hidden mb-2 relative">
           <MapContainer
