@@ -65,6 +65,26 @@ export default function CreateModal({ onClose }) {
     }
   };
 
+  const setLocationFromAddress = () => {
+    if (address.includes(",")) {
+      const parts = address.split(",");
+      const lat = parseFloat(parts[0]);
+      const lng = parseFloat(parts[1]);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        setLocation([lat, lng]);
+        if (mapRef.current) {
+          mapRef.current.setView([lat, lng], 14);
+        }
+      }
+    }
+  };
+
+  const recenterMap = () => {
+    if (mapRef.current) {
+      mapRef.current.setView(location, 14);
+    }
+  };
+
   const handleSubmit = async () => {
     let photoUrls = [];
 
@@ -244,7 +264,7 @@ export default function CreateModal({ onClose }) {
             Cancel
           </button>
           <button
-            onClick={handleSubmit}
+            type="button" onClick={handleSubmit}
             className="bg-black text-white px-4 py-2 rounded-full"
           >
             Publish
