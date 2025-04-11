@@ -76,6 +76,11 @@ export default function CreateModal({ onClose }) {
   }, [images]);
 
   const useMyLocation = () => {
+    if (isUsingCurrentLocation) {
+      setIsUsingCurrentLocation(false);
+      return;
+    }
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -97,36 +102,34 @@ export default function CreateModal({ onClose }) {
   const setLocationFromAddress = () => {
     if (!address) return;
 
+    // Try to parse coordinates
     if (address.includes(",")) {
       const parts = address.split(",");
       const lat = parseFloat(parts[0].trim());
       const lng = parseFloat(parts[1].trim());
       if (!isNaN(lat) && !isNaN(lng)) {
-        setLocation([lat, lng]);
+        const newLocation = [lat, lng];
+        setLocation(newLocation);
         setIsUsingCurrentLocation(false);
         if (mapRef.current) {
-          mapRef.current.setView([lat, lng], 15);
+          mapRef.current.setView(newLocation, 15);
         }
         return;
       }
     }
 
+    // Try to parse Google Maps link
     const googleMapsRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
     const match = address.match(googleMapsRegex);
     if (match) {
       const lat = parseFloat(match[1]);
       const lng = parseFloat(match[2]);
-      setLocation([lat, lng]);
+      const newLocation = [lat, lng];
+      setLocation(newLocation);
       setIsUsingCurrentLocation(false);
       if (mapRef.current) {
-        mapRef.current.setView([lat, lng], 15);
+        mapRef.current.setView(newLocation, 15);
       }
-    }
-  };
-
-  const recenterMap = () => {
-    if (mapRef.current && location) {
-      mapRef.current.setView(location, 15);
     }
   };
 
@@ -253,7 +256,7 @@ export default function CreateModal({ onClose }) {
                 : "bg-white text-black"
             }`}
           >
-            Use My Current Location
+            {isUsingCurrentLocation ? "Using Current Location" : "Use My Current Location"}
           </button>
           <div className="flex gap-2">
             <input
@@ -288,12 +291,6 @@ export default function CreateModal({ onClose }) {
             <LocationSelector setLocation={setLocation} />
             <Marker position={location} />
           </MapContainer>
-          <button
-            onClick={recenterMap}
-            className="absolute bottom-2 right-2 bg-white text-black px-2 py-1 text-xs rounded shadow"
-          >
-            ⟳ Recenter
-          </button>
         </div>
 
         <label className="text-sm text-gray-500">Price</label>
