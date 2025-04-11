@@ -1,16 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
-import L from "leaflet";
 import { supabase } from "../../lib/supabase";
 import "leaflet/dist/leaflet.css";
-
-// Fix Leaflet icon
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-});
 
 const activityCategories = [
   "Meal", "Ride", "Meet-up", "Entertainment", "Relaxation", "Learning", "Help", "Others",
@@ -88,7 +79,7 @@ export default function CreateModal({ onClose }) {
           setLocation(coords);
           setIsUsingCurrentLocation(true);
           if (mapRef.current) {
-            mapRef.current.setView(coords, 15);
+            mapRef.current.flyTo(coords, 15);
           }
         },
         (err) => {
@@ -112,7 +103,7 @@ export default function CreateModal({ onClose }) {
         setLocation(newLocation);
         setIsUsingCurrentLocation(false);
         if (mapRef.current) {
-          mapRef.current.setView(newLocation, 15);
+          mapRef.current.flyTo(newLocation, 15);
         }
         return;
       }
@@ -128,7 +119,7 @@ export default function CreateModal({ onClose }) {
       setLocation(newLocation);
       setIsUsingCurrentLocation(false);
       if (mapRef.current) {
-        mapRef.current.setView(newLocation, 15);
+        mapRef.current.flyTo(newLocation, 15);
       }
     }
   };
@@ -250,7 +241,7 @@ export default function CreateModal({ onClose }) {
         <div className="flex flex-col gap-2 mb-2">
           <button
             onClick={useMyLocation}
-            className={`p-2 rounded border ${
+            className={`p-1.5 rounded border ${
               isUsingCurrentLocation
                 ? "bg-black text-white"
                 : "bg-white text-black"
