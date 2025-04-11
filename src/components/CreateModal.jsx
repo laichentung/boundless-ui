@@ -1,9 +1,16 @@
-
 import { useState, useRef, useEffect } from "react";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import { supabase } from "../../lib/supabase";
 import "leaflet/dist/leaflet.css";
+
+// Fix Leaflet icon
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
 
 const activityCategories = [
   "Meal", "Ride", "Meet-up", "Entertainment", "Relaxation", "Learning", "Help", "Others",
@@ -34,6 +41,7 @@ export default function CreateModal({ onClose }) {
   const [images, setImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [showToast, setShowToast] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const mapRef = useRef();
 
@@ -46,86 +54,94 @@ export default function CreateModal({ onClose }) {
     }
   }, [images]);
 
-  // const recenterMap = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        const coords = [pos.coords.latitude, pos.coords.longitude];
-        setLocation(coords);
-        mapRef.current.setView(coords, 15);
-      });
-    }
-  };
-
   const useMyLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((pos) => {
         const coords = [pos.coords.latitude, pos.coords.longitude];
         setLocation(coords);
+        if (mapRef.current) {
+          mapRef.current.setView(coords, 15);
+        }
       });
     }
   };
 
-  
-const setLocationFromAddress = () => {
-  if (address.includes(",")) {
-    const parts = address.split(",");
-    const lat = parseFloat(parts[0]);
-    const lng = parseFloat(parts[1]);
-    if (!isNaN(lat) && !isNaN(lng)) {
-      setLocation([lat, lng]);
-      if (mapRef.current) {
-        mapRef.current.setView([lat, lng], 14);
+  const setLocationFromAddress = () => {
+    if (address.includes(",")) {
+      const parts = address.split(",");
+      const lat = parseFloat(parts[0]);
+      const lng = parseFloat(parts[1]);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        setLocation([lat, lng]);
+        if (mapRef.current) {
+          mapRef.current.setView([lat, lng], 15);
+        }
       }
     }
-  }
-};
+  };
 
-const recenterMap = () => {
-  if (mapRef.current) {
-    mapRef.current.setView(location, 14);
-  }
-};
+  const recenterMap = () => {
+    if (mapRef.current) {
+      mapRef.current.setView(location, 15);
+    }
+  };
 
-
-const handleSubmit = async () => {
-    let photoUrls = [];
-
-    for (const image of images) {
-      const filename = `${Date.now()}_${image.name}`;
-      const { data, error } = await supabase.storage
-        .from("activity-photos")
-        .upload(filename, image);
-
-      if (!error) {
-        const { data: urlData } = supabase.storage
-          .from("activity-photos")
-          .getPublicUrl(filename);
-        photoUrls.push(urlData.publicUrl);
-      }
+  const handleSubmit = async () => {
+    if (!title || !timeStart || !timeEnd || !location) {
+      alert("Please fill in all required fields");
+      return;
     }
 
-    const { error } = await supabase.from("activities").insert([
-      {
-        title,
-        type,
-        category,
-        time_start: timeStart,
-        time_end: timeEnd,
-        price: unit === "Free" ? 0 : parseFloat(price),
-        unit,
-        latitude: location[0],
-        longitude: location[1],
-        photos: photoUrls,
-        address,
-      },
-    ]);
+    setIsSubmitting(true);
+    try {
+      let photoUrls = [];
 
-    if (!error) {
+      // Upload images if any
+      if (images.length > 0) {
+        for (const image of images) {
+          const filename = `${Date.now()}_${image.name}`;
+          const { data, error } = await supabase.storage
+            .from("activity-photos")
+            .upload(filename, image);
+
+          if (error) throw error;
+
+          const { data: urlData } = supabase.storage
+            .from("activity-photos")
+            .getPublicUrl(filename);
+          photoUrls.push(urlData.publicUrl);
+        }
+      }
+
+      // Insert activity
+      const { error } = await supabase.from("activities").insert([
+        {
+          title,
+          type,
+          category,
+          time_start: timeStart,
+          time_end: timeEnd,
+          price: unit === "Free" ? 0 : parseFloat(price),
+          unit,
+          latitude: location[0],
+          longitude: location[1],
+          photos: photoUrls,
+          address,
+        },
+      ]);
+
+      if (error) throw error;
+
       setShowToast(true);
       setTimeout(() => {
         setShowToast(false);
         onClose();
       }, 2000);
+    } catch (error) {
+      console.error("Error creating activity:", error);
+      alert("Failed to create activity. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -181,14 +197,22 @@ const handleSubmit = async () => {
           />
         </div>
 
-        <label className="text-sm text-gray-500">Address or Google Map Link</label>
-        <input
-          type="text"
-          placeholder="Paste Google Maps link or type address"
-          className="border p-2 w-full mb-2"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-        />
+        <label className="text-sm text-gray-500">Address or Coordinates</label>
+        <div className="flex gap-2 mb-2">
+          <input
+            type="text"
+            placeholder="Paste Google Maps link, address, or coordinates"
+            className="border p-2 flex-1"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+          />
+          <button
+            onClick={setLocationFromAddress}
+            className="bg-black text-white px-3 py-2 rounded"
+          >
+            Set
+          </button>
+        </div>
 
         <button
           onClick={useMyLocation}
@@ -200,14 +224,14 @@ const handleSubmit = async () => {
         <div className="h-48 rounded-lg overflow-hidden mb-2 relative">
           <MapContainer
             center={location}
-            zoom={14}
+            zoom={15}
             className="h-full w-full z-0"
             whenCreated={(mapInstance) => {
               mapRef.current = mapInstance;
             }}
           >
             <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
               attribution=""
             />
             <LocationSelector setLocation={setLocation} />
@@ -248,33 +272,40 @@ const handleSubmit = async () => {
           accept="image/*"
           multiple
           onChange={(e) => setImages(Array.from(e.target.files))}
-          className="mb-2"
+          className="mb-4"
         />
-        <div className="grid grid-cols-4 gap-2 mb-4">
-          {imagePreviews.map((src, idx) => (
-            <img
-              key={idx}
-              src={src}
-              alt={`preview-${idx}`}
-              className="rounded object-cover w-full h-20"
-            />
-          ))}
-        </div>
 
-        <div className="flex justify-between">
-          <button onClick={onClose} className="text-gray-600">
+        {imagePreviews.length > 0 && (
+          <div className="flex gap-2 mb-4 overflow-x-auto">
+            {imagePreviews.map((preview, index) => (
+              <img
+                key={index}
+                src={preview}
+                alt={`Preview ${index + 1}`}
+                className="h-20 w-20 object-cover rounded"
+              />
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 border border-gray-300 p-2 rounded"
+          >
             Cancel
           </button>
           <button
-            type="button" onClick={handleSubmit}
-            className="bg-black text-white px-4 py-2 rounded-full"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="flex-1 bg-black text-white p-2 rounded disabled:opacity-50"
           >
-            Publish
+            {isSubmitting ? "Publishing..." : "Publish"}
           </button>
         </div>
 
         {showToast && (
-          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-black text-white px-6 py-2 rounded-full shadow-md transition-all">
+          <div className="absolute bottom-4 left-4 right-4 bg-green-500 text-white p-2 rounded text-center">
             Activity published successfully!
           </div>
         )}
