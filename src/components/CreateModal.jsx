@@ -141,40 +141,6 @@ export default function CreateModal({ onClose }) {
         </div>
 
         <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-gray-500 mb-2">Service / Activity</h3>
-          <div className="grid grid-cols-2 gap-3">
-            {activityCategories.map(label => (
-              <button 
-                key={label} 
-                onClick={() => setSelectedCategory(label)}
-                className={`p-3 rounded-xl border ${
-                  selectedCategory === label 
-                    ? "border-black bg-black text-white" 
-                    : "border-gray-300 hover:border-black hover:bg-gray-50"
-                } text-sm capitalize`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <h3 className="text-sm font-semibold text-gray-500 mb-2">Resource</h3>
-          <div className="grid grid-cols-2 gap-3">
-            {resourceCategories.map(label => (
-              <button 
-                key={label} 
-                onClick={() => setSelectedCategory(label)}
-                className={`p-3 rounded-xl border ${
-                  selectedCategory === label 
-                    ? "border-black bg-black text-white" 
-                    : "border-gray-300 hover:border-black hover:bg-gray-50"
-                } text-sm capitalize`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
           <input 
             name="title" 
             type="text" 
@@ -182,6 +148,24 @@ export default function CreateModal({ onClose }) {
             onChange={handleInput} 
             className="w-full border px-3 py-2 rounded-md" 
           />
+
+          <select
+            value={selectedCategory || ""}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="w-full border px-3 py-2 rounded-md bg-white"
+          >
+            <option value="" disabled>Select a category</option>
+            <optgroup label="Activities">
+              {activityCategories.map(category => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Resources">
+              {resourceCategories.map(category => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </optgroup>
+          </select>
 
           <label className="block text-sm font-semibold text-gray-600">Time</label>
           <div className="flex gap-2 items-center">
