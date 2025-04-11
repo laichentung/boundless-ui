@@ -79,7 +79,10 @@ export default function CreateModal({ onClose }) {
           setLocation(coords);
           setIsUsingCurrentLocation(true);
           if (mapRef.current) {
-            mapRef.current.flyTo(coords, 15);
+            mapRef.current.setView(coords, 15, {
+              animate: true,
+              duration: 1
+            });
           }
         },
         (err) => {
@@ -93,33 +96,37 @@ export default function CreateModal({ onClose }) {
   const setLocationFromAddress = () => {
     if (!address) return;
 
+    let newLocation = null;
+
     // Try to parse coordinates
     if (address.includes(",")) {
       const parts = address.split(",");
       const lat = parseFloat(parts[0].trim());
       const lng = parseFloat(parts[1].trim());
       if (!isNaN(lat) && !isNaN(lng)) {
-        const newLocation = [lat, lng];
-        setLocation(newLocation);
-        setIsUsingCurrentLocation(false);
-        if (mapRef.current) {
-          mapRef.current.flyTo(newLocation, 15);
-        }
-        return;
+        newLocation = [lat, lng];
       }
     }
 
     // Try to parse Google Maps link
-    const googleMapsRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const match = address.match(googleMapsRegex);
-    if (match) {
-      const lat = parseFloat(match[1]);
-      const lng = parseFloat(match[2]);
-      const newLocation = [lat, lng];
+    if (!newLocation) {
+      const googleMapsRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+      const match = address.match(googleMapsRegex);
+      if (match) {
+        const lat = parseFloat(match[1]);
+        const lng = parseFloat(match[2]);
+        newLocation = [lat, lng];
+      }
+    }
+
+    if (newLocation) {
       setLocation(newLocation);
       setIsUsingCurrentLocation(false);
       if (mapRef.current) {
-        mapRef.current.flyTo(newLocation, 15);
+        mapRef.current.setView(newLocation, 15, {
+          animate: true,
+          duration: 1
+        });
       }
     }
   };
