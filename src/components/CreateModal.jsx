@@ -79,7 +79,8 @@ export default function CreateModal({ onClose }) {
           setLocation(coords);
           setIsUsingCurrentLocation(true);
           if (mapRef.current) {
-            mapRef.current.setView(coords, 15, {
+            const map = mapRef.current;
+            map.setView(coords, 15, {
               animate: true,
               duration: 1
             });
@@ -123,7 +124,8 @@ export default function CreateModal({ onClose }) {
       setLocation(newLocation);
       setIsUsingCurrentLocation(false);
       if (mapRef.current) {
-        mapRef.current.setView(newLocation, 15, {
+        const map = mapRef.current;
+        map.setView(newLocation, 15, {
           animate: true,
           duration: 1
         });
