@@ -109,6 +109,11 @@ export default function CreateModal({ onClose }) {
       return;
     }
 
+    if (!formData.title || !formData.timeStart || !formData.timeEnd || !location) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
     try {
       // Upload photos first
       let photoUrls = [];
@@ -137,21 +142,23 @@ export default function CreateModal({ onClose }) {
       }
 
       // Create the activity record
-      const activity = {
-        title: formData.title,
-        description: formData.description,
-        type: activityCategories.includes(selectedCategory) ? "activity" : "resource",
-        category: selectedCategory,
-        latitude: location?.[0],
-        longitude: location?.[1],
-        time_start: formData.timeStart,
-        time_end: formData.timeEnd,
-        price: formData.unit === "Free" ? 0 : parseFloat(formData.price),
-        unit: formData.unit,
-        photos: photoUrls,
-      };
-
-      const { error } = await supabase.from("activities").insert([activity]).select();
+      const { error } = await supabase
+        .from('activities')
+        .insert([
+          {
+            title: formData.title,
+            description: formData.description,
+            type: activityCategories.includes(selectedCategory) ? "activity" : "resource",
+            category: selectedCategory,
+            latitude: location[0],
+            longitude: location[1],
+            time_start: formData.timeStart,
+            time_end: formData.timeEnd,
+            price: formData.unit === "Free" ? 0 : parseFloat(formData.price),
+            unit: formData.unit,
+            photos: photoUrls,
+          }
+        ]);
 
       if (error) {
         throw error;
