@@ -109,30 +109,62 @@ export default function CreateModal({ onClose }) {
       return;
     }
 
-    const activity = {
-      title: formData.title,
-      description: formData.description,
-      type: activityCategories.includes(selectedCategory) ? "activity" : "resource",
-      category: selectedCategory,
-      latitude: location?.[0],
-      longitude: location?.[1],
-      time_start: formData.timeStart,
-      time_end: formData.timeEnd,
-      price: formData.unit === "Free" ? 0 : parseFloat(formData.price),
-      unit: formData.unit,
-      photos: [],
-    };
+    try {
+      // Upload photos first
+      let photoUrls = [];
+      if (formData.photos.length > 0) {
+        for (const photo of formData.photos) {
+          const fileExt = photo.name.split('.').pop();
+          const fileName = `${Math.random()}.${fileExt}`;
+          const filePath = `${fileName}`;
 
-    const { error } = await supabase.from("activities").insert([activity]).select();
+          // Upload to Supabase Storage
+          const { error: uploadError } = await supabase.storage
+            .from('activity-photos')
+            .upload(filePath, photo);
 
-    if (error) {
-      alert("❌ Failed to publish: " + error.message);
-    } else {
+          if (uploadError) {
+            throw uploadError;
+          }
+
+          // Get the public URL
+          const { data: { publicUrl } } = supabase.storage
+            .from('activity-photos')
+            .getPublicUrl(filePath);
+
+          photoUrls.push(publicUrl);
+        }
+      }
+
+      // Create the activity record
+      const activity = {
+        title: formData.title,
+        description: formData.description,
+        type: activityCategories.includes(selectedCategory) ? "activity" : "resource",
+        category: selectedCategory,
+        latitude: location?.[0],
+        longitude: location?.[1],
+        time_start: formData.timeStart,
+        time_end: formData.timeEnd,
+        price: formData.unit === "Free" ? 0 : parseFloat(formData.price),
+        unit: formData.unit,
+        photos: photoUrls,
+      };
+
+      const { error } = await supabase.from("activities").insert([activity]).select();
+
+      if (error) {
+        throw error;
+      }
+
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
         onClose();
       }, 2000);
+    } catch (error) {
+      console.error("Error creating activity:", error);
+      alert("❌ Failed to publish: " + error.message);
     }
   };
 
