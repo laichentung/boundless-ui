@@ -43,6 +43,9 @@ export default function CreateModal({ onClose }) {
   const [location, setLocation] = useState(null);
   const [inputLocation, setInputLocation] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [isSettingLocation, setIsSettingLocation] = useState(false);
   const mapRef = useRef();
 
   const [formData, setFormData] = useState({
@@ -65,41 +68,59 @@ export default function CreateModal({ onClose }) {
     setFormData({ ...formData, photos: files });
   };
 
-  const handleLocationInput = () => {
-    if (!inputLocation) return;
-    const latLngMatch = inputLocation.match(/(-?[\d.]+)[,\s]+(-?[\d.]+)/);
-    const atMatch = inputLocation.match(/@(-?[\d.]+),(-?[\d.]+)/);
-    const queryMatch = inputLocation.match(/[?&](q|ll)=(-?[\d.]+),(-?[\d.]+)/);
-
-    let lat = null;
-    let lng = null;
-
-    if (latLngMatch) {
-      lat = parseFloat(latLngMatch[1]);
-      lng = parseFloat(latLngMatch[2]);
-    } else if (atMatch) {
-      lat = parseFloat(atMatch[1]);
-      lng = parseFloat(atMatch[2]);
-    } else if (queryMatch) {
-      lat = parseFloat(queryMatch[2]);
-      lng = parseFloat(queryMatch[3]);
-    }
-
-    if (lat && lng) {
-      setLocation([lat, lng]);
-      if (mapRef.current) mapRef.current.setView([lat, lng], 15);
-    } else {
-      alert("⚠️ 請輸入有效的經緯度或含座標的 Google Maps 連結。");
+  const recenter = async () => {
+    if (navigator.geolocation) {
+      setIsGettingLocation(true);
+      try {
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject);
+        });
+        const coords = [position.coords.latitude, position.coords.longitude];
+        setLocation(coords);
+        if (mapRef.current) {
+          mapRef.current.setView(coords, 15);
+        }
+      } catch (error) {
+        console.error("Geolocation error:", error);
+        alert("Failed to get your location. Please try again.");
+      } finally {
+        setIsGettingLocation(false);
+      }
     }
   };
 
-  const recenter = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        const coords = [pos.coords.latitude, pos.coords.longitude];
-        setLocation(coords);
-        if (mapRef.current) mapRef.current.setView(coords, 15);
-      });
+  const handleLocationInput = async () => {
+    if (!inputLocation) return;
+    setIsSettingLocation(true);
+    try {
+      const latLngMatch = inputLocation.match(/(-?[\d.]+)[,\s]+(-?[\d.]+)/);
+      const atMatch = inputLocation.match(/@(-?[\d.]+),(-?[\d.]+)/);
+      const queryMatch = inputLocation.match(/[?&](q|ll)=(-?[\d.]+),(-?[\d.]+)/);
+
+      let lat = null;
+      let lng = null;
+
+      if (latLngMatch) {
+        lat = parseFloat(latLngMatch[1]);
+        lng = parseFloat(latLngMatch[2]);
+      } else if (atMatch) {
+        lat = parseFloat(atMatch[1]);
+        lng = parseFloat(atMatch[2]);
+      } else if (queryMatch) {
+        lat = parseFloat(queryMatch[2]);
+        lng = parseFloat(queryMatch[3]);
+      }
+
+      if (lat && lng) {
+        setLocation([lat, lng]);
+        if (mapRef.current) {
+          mapRef.current.setView([lat, lng], 15);
+        }
+      } else {
+        alert("⚠️ Please enter valid coordinates or a Google Maps link with coordinates.");
+      }
+    } finally {
+      setIsSettingLocation(false);
     }
   };
 
@@ -114,7 +135,12 @@ export default function CreateModal({ onClose }) {
       return;
     }
 
+    setIsPublishing(true);
     try {
+      // Get the current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+
       // Upload photos first
       let photoUrls = [];
       if (formData.photos.length > 0) {
@@ -123,16 +149,12 @@ export default function CreateModal({ onClose }) {
           const fileName = `${Math.random()}.${fileExt}`;
           const filePath = `${fileName}`;
 
-          // Upload to Supabase Storage
           const { error: uploadError } = await supabase.storage
             .from('activity-photos')
             .upload(filePath, photo);
 
-          if (uploadError) {
-            throw uploadError;
-          }
+          if (uploadError) throw uploadError;
 
-          // Get the public URL
           const { data: { publicUrl } } = supabase.storage
             .from('activity-photos')
             .getPublicUrl(filePath);
@@ -141,7 +163,7 @@ export default function CreateModal({ onClose }) {
         }
       }
 
-      // Create the activity record
+      // Create the activity record with user_id
       const { error } = await supabase
         .from('activities')
         .insert([
@@ -157,12 +179,11 @@ export default function CreateModal({ onClose }) {
             price: formData.unit === "Free" ? 0 : parseFloat(formData.price),
             unit: formData.unit,
             photos: photoUrls,
+            user_id: user.id
           }
         ]);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       setShowSuccess(true);
       setTimeout(() => {
@@ -172,6 +193,8 @@ export default function CreateModal({ onClose }) {
     } catch (error) {
       console.error("Error creating activity:", error);
       alert("❌ Failed to publish: " + error.message);
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -244,10 +267,13 @@ export default function CreateModal({ onClose }) {
             <label className="text-sm font-medium text-gray-700">Location</label>
             <button 
               onClick={recenter} 
-              className="w-full text-sm px-4 py-2.5 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+              className={`w-full text-sm px-4 py-2.5 border border-gray-200 rounded-lg ${
+                isGettingLocation ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
+              } transition-colors flex items-center justify-center gap-2`}
+              disabled={isGettingLocation}
             >
               <span>📍</span>
-              <span>Use My Current Location</span>
+              <span>{isGettingLocation ? 'Getting location...' : 'Use My Current Location'}</span>
             </button>
             <div className="flex gap-2">
               <input 
@@ -259,9 +285,12 @@ export default function CreateModal({ onClose }) {
               />
               <button 
                 onClick={handleLocationInput}
-                className="px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white hover:bg-gray-50 transition-colors whitespace-nowrap"
+                className={`px-4 py-2.5 text-sm border border-gray-200 rounded-lg ${
+                  isSettingLocation ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
+                } transition-colors whitespace-nowrap`}
+                disabled={isSettingLocation}
               >
-                Set
+                {isSettingLocation ? 'Setting...' : 'Set'}
               </button>
             </div>
           </div>
@@ -353,9 +382,12 @@ export default function CreateModal({ onClose }) {
           <div className="pt-4 flex justify-end">
             <button 
               onClick={handleSubmit} 
-              className="bg-black text-white px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors"
+              disabled={isPublishing}
+              className={`bg-black text-white px-6 py-2.5 rounded-lg ${
+                isPublishing ? 'opacity-75' : 'hover:bg-gray-800'
+              } transition-colors`}
             >
-              Publish
+              {isPublishing ? 'Publishing...' : 'Publish'}
             </button>
           </div>
         </div>
