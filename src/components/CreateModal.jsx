@@ -13,6 +13,7 @@ import { MapContainer, TileLayer, useMapEvents, Marker, useMap } from "react-lea
 import { supabase } from "../../lib/supabase";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import AuthModal from "./AuthModal";
 
 function LocationSelector({ setLocation }) {
   useMapEvents({
@@ -38,7 +39,7 @@ function CenterOnCurrentLocation({ setLocation }) {
   return null;
 }
 
-export default function CreateModal({ onClose }) {
+export default function CreateModal({ onClose, onSuccess }) {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [location, setLocation] = useState(null);
   const [inputLocation, setInputLocation] = useState("");
@@ -47,6 +48,7 @@ export default function CreateModal({ onClose }) {
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [isSettingLocation, setIsSettingLocation] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const mapRef = useRef();
 
   const [formData, setFormData] = useState({
@@ -134,14 +136,11 @@ export default function CreateModal({ onClose }) {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
     if (!isAuthenticated) {
-      alert("Please sign in to publish an activity");
-      return;
-    }
-
-    if (!selectedCategory) {
-      alert("Please select a category");
+      setShowAuthModal(true);
       return;
     }
 
@@ -152,17 +151,15 @@ export default function CreateModal({ onClose }) {
 
     setIsPublishing(true);
     try {
-      // Get the current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
 
-      // Upload photos first
-      let photoUrls = [];
+      const photoUrls = [];
       if (formData.photos.length > 0) {
         for (const photo of formData.photos) {
           const fileExt = photo.name.split('.').pop();
           const fileName = `${Math.random()}.${fileExt}`;
-          const filePath = `${fileName}`;
+          const filePath = `${user.id}/${fileName}`;
 
           const { error: uploadError } = await supabase.storage
             .from('activity-photos')
@@ -178,259 +175,265 @@ export default function CreateModal({ onClose }) {
         }
       }
 
-      // Create the activity record with user_id
       const { error } = await supabase
         .from('activities')
-        .insert([
-          {
-            title: formData.title,
-            description: formData.description,
-            type: activityCategories.includes(selectedCategory) ? "activity" : "resource",
-            category: selectedCategory,
-            latitude: location[0],
-            longitude: location[1],
-            time_start: formData.timeStart,
-            time_end: formData.timeEnd,
-            price: formData.unit === "Free" ? 0 : parseFloat(formData.price),
-            unit: formData.unit,
-            photos: photoUrls,
-            user_id: user.id
-          }
-        ]);
+        .insert({
+          title: formData.title,
+          category: selectedCategory,
+          time_start: formData.timeStart,
+          time_end: formData.timeEnd,
+          location: location,
+          price: formData.price,
+          description: formData.description,
+          photos: photoUrls,
+          user_id: user.id
+        });
 
       if (error) throw error;
 
       setShowSuccess(true);
       setTimeout(() => {
-        setShowSuccess(false);
+        onSuccess();
         onClose();
       }, 2000);
     } catch (error) {
-      console.error("Error creating activity:", error);
-      alert("❌ Failed to publish: " + error.message);
+      console.error('Error:', error);
+      alert(`Failed to publish: ${error.message}`);
     } finally {
       setIsPublishing(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white w-[90%] max-w-md rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Share something</h2>
-          <button 
-            onClick={onClose} 
-            className="text-gray-400 hover:text-black transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-
-        {!isAuthenticated ? (
-          <div className="text-center py-8">
-            <p className="text-gray-600 mb-4">Please sign in to share an activity</p>
-            <button
-              onClick={() => {
-                onClose();
-                // You might want to redirect to sign in page or show sign in modal
-              }}
-              className="bg-black text-white px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors"
+    <>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white w-[90%] max-w-md rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Share something</h2>
+            <button 
+              onClick={onClose} 
+              className="text-gray-400 hover:text-black transition-colors"
             >
-              Sign In
+              ✕
             </button>
           </div>
-        ) : (
-          <div className="space-y-5">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Title</label>
-              <input 
-                name="title" 
-                type="text" 
-                placeholder="What are you sharing?"
-                onChange={handleInput} 
-                className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
-              />
-            </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Category</label>
-              <select
-                value={selectedCategory || ""}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent bg-white"
+          {!isAuthenticated ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600 mb-4">Please sign in to share an activity</p>
+              <button
+                onClick={() => {
+                  onClose();
+                  // You might want to redirect to sign in page or show sign in modal
+                }}
+                className="bg-black text-white px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors"
               >
-                <option value="" disabled>Select a category</option>
-                <optgroup label="Activities">
-                  {activityCategories.map(category => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
-                </optgroup>
-                <optgroup label="Resources">
-                  {resourceCategories.map(category => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
-                </optgroup>
-              </select>
+                Sign In
+              </button>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Time</label>
-              <div className="flex gap-2 items-center">
+          ) : (
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Title</label>
                 <input 
-                  name="timeStart" 
-                  type="datetime-local" 
-                  onChange={handleInput}
-                  className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
-                />
-                <span className="text-gray-500">-</span>
-                <input 
-                  name="timeEnd" 
-                  type="datetime-local" 
-                  onChange={handleInput}
+                  name="title" 
+                  type="text" 
+                  placeholder="What are you sharing?"
+                  onChange={handleInput} 
                   className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
                 />
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Location</label>
-              <button 
-                onClick={recenter} 
-                className={`w-full text-sm px-4 py-2.5 border border-gray-200 rounded-lg ${
-                  isGettingLocation ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
-                } transition-colors flex items-center justify-center gap-2`}
-                disabled={isGettingLocation}
-              >
-                <span>📍</span>
-                <span>{isGettingLocation ? 'Getting location...' : 'Use My Current Location'}</span>
-              </button>
-              <div className="flex gap-2">
-                <input 
-                  type="text" 
-                  value={inputLocation} 
-                  onChange={(e) => setInputLocation(e.target.value)}
-                  placeholder="Enter coordinates or Google Maps link"
-                  className="flex-1 border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
-                />
-                <button 
-                  onClick={handleLocationInput}
-                  className={`px-4 py-2.5 text-sm border border-gray-200 rounded-lg ${
-                    isSettingLocation ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
-                  } transition-colors whitespace-nowrap`}
-                  disabled={isSettingLocation}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Category</label>
+                <select
+                  value={selectedCategory || ""}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent bg-white"
                 >
-                  {isSettingLocation ? 'Setting...' : 'Set'}
+                  <option value="" disabled>Select a category</option>
+                  <optgroup label="Activities">
+                    {activityCategories.map(category => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Resources">
+                    {resourceCategories.map(category => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Time</label>
+                <div className="flex gap-2 items-center">
+                  <input 
+                    name="timeStart" 
+                    type="datetime-local" 
+                    onChange={handleInput}
+                    className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
+                  />
+                  <span className="text-gray-500">-</span>
+                  <input 
+                    name="timeEnd" 
+                    type="datetime-local" 
+                    onChange={handleInput}
+                    className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Location</label>
+                <button 
+                  onClick={recenter} 
+                  className={`w-full text-sm px-4 py-2.5 border border-gray-200 rounded-lg ${
+                    isGettingLocation ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
+                  } transition-colors flex items-center justify-center gap-2`}
+                  disabled={isGettingLocation}
+                >
+                  <span>📍</span>
+                  <span>{isGettingLocation ? 'Getting location...' : 'Use My Current Location'}</span>
+                </button>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={inputLocation} 
+                    onChange={(e) => setInputLocation(e.target.value)}
+                    placeholder="Enter coordinates or Google Maps link"
+                    className="flex-1 border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
+                  />
+                  <button 
+                    onClick={handleLocationInput}
+                    className={`px-4 py-2.5 text-sm border border-gray-200 rounded-lg ${
+                      isSettingLocation ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
+                    } transition-colors whitespace-nowrap`}
+                    disabled={isSettingLocation}
+                  >
+                    {isSettingLocation ? 'Setting...' : 'Set'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="relative w-full h-64 rounded-lg overflow-hidden border border-gray-200">
+                <MapContainer 
+                  ref={mapRef} 
+                  center={[25.033, 121.5654]} 
+                  zoom={14}
+                  style={{ height: "100%", width: "100%" }} 
+                  attributionControl={false}
+                >
+                  <TileLayer 
+                    url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" 
+                    attribution=""
+                  />
+                  <LocationSelector setLocation={setLocation} />
+                  <CenterOnCurrentLocation setLocation={setLocation} />
+                  {location && (
+                    <Marker 
+                      position={location} 
+                      icon={L.icon({
+                        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+                        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+                      })} 
+                    />
+                  )}
+                </MapContainer>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Price</label>
+                <div className="flex gap-2">
+                  <select 
+                    name="unit" 
+                    value={formData.unit} 
+                    onChange={handleInput}
+                    className="border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                  >
+                    <option value="USD">$</option>
+                    <option value="Bound">Bound</option>
+                    <option value="Free">Free</option>
+                  </select>
+                  <input 
+                    name="price" 
+                    type="number" 
+                    placeholder="Amount" 
+                    onChange={handleInput}
+                    disabled={formData.unit === "Free"}
+                    className="flex-1 border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent bg-white disabled:bg-gray-50" 
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Description</label>
+                <textarea 
+                  name="description" 
+                  placeholder="Tell us more about what you're sharing..."
+                  onChange={handleInput}
+                  className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent h-24" 
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Photos</label>
+                <input 
+                  type="file" 
+                  multiple 
+                  accept="image/*" 
+                  onChange={handlePhotoUpload} 
+                  className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
+                />
+              </div>
+              
+              {formData.photos.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {formData.photos.map((file, i) => (
+                    <img 
+                      key={i} 
+                      src={URL.createObjectURL(file)} 
+                      alt="preview"
+                      className="h-24 w-24 object-cover rounded-lg border border-gray-200" 
+                    />
+                  ))}
+                </div>
+              )}
+
+              <div className="pt-4 flex justify-end">
+                <button 
+                  onClick={handleSubmit} 
+                  disabled={isPublishing}
+                  className={`bg-black text-white px-6 py-2.5 rounded-lg ${
+                    isPublishing ? 'opacity-75' : 'hover:bg-gray-800'
+                  } transition-colors`}
+                >
+                  {isPublishing ? 'Publishing...' : 'Publish'}
                 </button>
               </div>
             </div>
+          )}
 
-            <div className="relative w-full h-64 rounded-lg overflow-hidden border border-gray-200">
-              <MapContainer 
-                ref={mapRef} 
-                center={[25.033, 121.5654]} 
-                zoom={14}
-                style={{ height: "100%", width: "100%" }} 
-                attributionControl={false}
-              >
-                <TileLayer 
-                  url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" 
-                  attribution=""
-                />
-                <LocationSelector setLocation={setLocation} />
-                <CenterOnCurrentLocation setLocation={setLocation} />
-                {location && (
-                  <Marker 
-                    position={location} 
-                    icon={L.icon({
-                      iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-                      shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-                    })} 
-                  />
-                )}
-              </MapContainer>
+          {showSuccess && (
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+              <span>Successfully published!</span>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Price</label>
-              <div className="flex gap-2">
-                <select 
-                  name="unit" 
-                  value={formData.unit} 
-                  onChange={handleInput}
-                  className="border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                >
-                  <option value="USD">$</option>
-                  <option value="Bound">Bound</option>
-                  <option value="Free">Free</option>
-                </select>
-                <input 
-                  name="price" 
-                  type="number" 
-                  placeholder="Amount" 
-                  onChange={handleInput}
-                  disabled={formData.unit === "Free"}
-                  className="flex-1 border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent bg-white disabled:bg-gray-50" 
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Description</label>
-              <textarea 
-                name="description" 
-                placeholder="Tell us more about what you're sharing..."
-                onChange={handleInput}
-                className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent h-24" 
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Photos</label>
-              <input 
-                type="file" 
-                multiple 
-                accept="image/*" 
-                onChange={handlePhotoUpload} 
-                className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
-              />
-            </div>
-            
-            {formData.photos.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                {formData.photos.map((file, i) => (
-                  <img 
-                    key={i} 
-                    src={URL.createObjectURL(file)} 
-                    alt="preview"
-                    className="h-24 w-24 object-cover rounded-lg border border-gray-200" 
-                  />
-                ))}
-              </div>
-            )}
-
-            <div className="pt-4 flex justify-end">
-              <button 
-                onClick={handleSubmit} 
-                disabled={isPublishing}
-                className={`bg-black text-white px-6 py-2.5 rounded-lg ${
-                  isPublishing ? 'opacity-75' : 'hover:bg-gray-800'
-                } transition-colors`}
-              >
-                {isPublishing ? 'Publishing...' : 'Publish'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {showSuccess && (
-          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <span>Successfully published!</span>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+
+      {showAuthModal && (
+        <AuthModal
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={() => {
+            setIsAuthenticated(true);
+            setShowAuthModal(false);
+          }}
+        />
+      )}
+    </>
   );
 }
