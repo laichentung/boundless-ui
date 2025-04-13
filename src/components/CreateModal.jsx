@@ -46,6 +46,7 @@ export default function CreateModal({ onClose }) {
   const [isPublishing, setIsPublishing] = useState(false);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [isSettingLocation, setIsSettingLocation] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const mapRef = useRef();
 
   const [formData, setFormData] = useState({
@@ -57,6 +58,15 @@ export default function CreateModal({ onClose }) {
     description: "",
     photos: [],
   });
+
+  // Check authentication status when component mounts
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
+    };
+    checkAuth();
+  }, []);
 
   const handleInput = (e) => {
     const { name, value } = e.target;
@@ -125,6 +135,11 @@ export default function CreateModal({ onClose }) {
   };
 
   const handleSubmit = async () => {
+    if (!isAuthenticated) {
+      alert("Please sign in to publish an activity");
+      return;
+    }
+
     if (!selectedCategory) {
       alert("Please select a category");
       return;
@@ -211,186 +226,201 @@ export default function CreateModal({ onClose }) {
           </button>
         </div>
 
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Title</label>
-            <input 
-              name="title" 
-              type="text" 
-              placeholder="What are you sharing?"
-              onChange={handleInput} 
-              className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Category</label>
-            <select
-              value={selectedCategory || ""}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent bg-white"
+        {!isAuthenticated ? (
+          <div className="text-center py-8">
+            <p className="text-gray-600 mb-4">Please sign in to share an activity</p>
+            <button
+              onClick={() => {
+                onClose();
+                // You might want to redirect to sign in page or show sign in modal
+              }}
+              className="bg-black text-white px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors"
             >
-              <option value="" disabled>Select a category</option>
-              <optgroup label="Activities">
-                {activityCategories.map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </optgroup>
-              <optgroup label="Resources">
-                {resourceCategories.map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </optgroup>
-            </select>
+              Sign In
+            </button>
           </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Time</label>
-            <div className="flex gap-2 items-center">
+        ) : (
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Title</label>
               <input 
-                name="timeStart" 
-                type="datetime-local" 
-                onChange={handleInput}
-                className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
-              />
-              <span className="text-gray-500">-</span>
-              <input 
-                name="timeEnd" 
-                type="datetime-local" 
-                onChange={handleInput}
+                name="title" 
+                type="text" 
+                placeholder="What are you sharing?"
+                onChange={handleInput} 
                 className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
               />
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Location</label>
-            <button 
-              onClick={recenter} 
-              className={`w-full text-sm px-4 py-2.5 border border-gray-200 rounded-lg ${
-                isGettingLocation ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
-              } transition-colors flex items-center justify-center gap-2`}
-              disabled={isGettingLocation}
-            >
-              <span>📍</span>
-              <span>{isGettingLocation ? 'Getting location...' : 'Use My Current Location'}</span>
-            </button>
-            <div className="flex gap-2">
-              <input 
-                type="text" 
-                value={inputLocation} 
-                onChange={(e) => setInputLocation(e.target.value)}
-                placeholder="Enter coordinates or Google Maps link"
-                className="flex-1 border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
-              />
-              <button 
-                onClick={handleLocationInput}
-                className={`px-4 py-2.5 text-sm border border-gray-200 rounded-lg ${
-                  isSettingLocation ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
-                } transition-colors whitespace-nowrap`}
-                disabled={isSettingLocation}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Category</label>
+              <select
+                value={selectedCategory || ""}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent bg-white"
               >
-                {isSettingLocation ? 'Setting...' : 'Set'}
+                <option value="" disabled>Select a category</option>
+                <optgroup label="Activities">
+                  {activityCategories.map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Resources">
+                  {resourceCategories.map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Time</label>
+              <div className="flex gap-2 items-center">
+                <input 
+                  name="timeStart" 
+                  type="datetime-local" 
+                  onChange={handleInput}
+                  className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
+                />
+                <span className="text-gray-500">-</span>
+                <input 
+                  name="timeEnd" 
+                  type="datetime-local" 
+                  onChange={handleInput}
+                  className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Location</label>
+              <button 
+                onClick={recenter} 
+                className={`w-full text-sm px-4 py-2.5 border border-gray-200 rounded-lg ${
+                  isGettingLocation ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
+                } transition-colors flex items-center justify-center gap-2`}
+                disabled={isGettingLocation}
+              >
+                <span>📍</span>
+                <span>{isGettingLocation ? 'Getting location...' : 'Use My Current Location'}</span>
+              </button>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={inputLocation} 
+                  onChange={(e) => setInputLocation(e.target.value)}
+                  placeholder="Enter coordinates or Google Maps link"
+                  className="flex-1 border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
+                />
+                <button 
+                  onClick={handleLocationInput}
+                  className={`px-4 py-2.5 text-sm border border-gray-200 rounded-lg ${
+                    isSettingLocation ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
+                  } transition-colors whitespace-nowrap`}
+                  disabled={isSettingLocation}
+                >
+                  {isSettingLocation ? 'Setting...' : 'Set'}
+                </button>
+              </div>
+            </div>
+
+            <div className="relative w-full h-64 rounded-lg overflow-hidden border border-gray-200">
+              <MapContainer 
+                ref={mapRef} 
+                center={[25.033, 121.5654]} 
+                zoom={14}
+                style={{ height: "100%", width: "100%" }} 
+                attributionControl={false}
+              >
+                <TileLayer 
+                  url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" 
+                  attribution=""
+                />
+                <LocationSelector setLocation={setLocation} />
+                <CenterOnCurrentLocation setLocation={setLocation} />
+                {location && (
+                  <Marker 
+                    position={location} 
+                    icon={L.icon({
+                      iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+                      shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+                    })} 
+                  />
+                )}
+              </MapContainer>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Price</label>
+              <div className="flex gap-2">
+                <select 
+                  name="unit" 
+                  value={formData.unit} 
+                  onChange={handleInput}
+                  className="border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                >
+                  <option value="USD">$</option>
+                  <option value="Bound">Bound</option>
+                  <option value="Free">Free</option>
+                </select>
+                <input 
+                  name="price" 
+                  type="number" 
+                  placeholder="Amount" 
+                  onChange={handleInput}
+                  disabled={formData.unit === "Free"}
+                  className="flex-1 border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent bg-white disabled:bg-gray-50" 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Description</label>
+              <textarea 
+                name="description" 
+                placeholder="Tell us more about what you're sharing..."
+                onChange={handleInput}
+                className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent h-24" 
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Photos</label>
+              <input 
+                type="file" 
+                multiple 
+                accept="image/*" 
+                onChange={handlePhotoUpload} 
+                className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
+              />
+            </div>
+            
+            {formData.photos.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {formData.photos.map((file, i) => (
+                  <img 
+                    key={i} 
+                    src={URL.createObjectURL(file)} 
+                    alt="preview"
+                    className="h-24 w-24 object-cover rounded-lg border border-gray-200" 
+                  />
+                ))}
+              </div>
+            )}
+
+            <div className="pt-4 flex justify-end">
+              <button 
+                onClick={handleSubmit} 
+                disabled={isPublishing}
+                className={`bg-black text-white px-6 py-2.5 rounded-lg ${
+                  isPublishing ? 'opacity-75' : 'hover:bg-gray-800'
+                } transition-colors`}
+              >
+                {isPublishing ? 'Publishing...' : 'Publish'}
               </button>
             </div>
           </div>
-
-          <div className="relative w-full h-64 rounded-lg overflow-hidden border border-gray-200">
-            <MapContainer 
-              ref={mapRef} 
-              center={[25.033, 121.5654]} 
-              zoom={14}
-              style={{ height: "100%", width: "100%" }} 
-              attributionControl={false}
-            >
-              <TileLayer 
-                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" 
-                attribution=""
-              />
-              <LocationSelector setLocation={setLocation} />
-              <CenterOnCurrentLocation setLocation={setLocation} />
-              {location && (
-                <Marker 
-                  position={location} 
-                  icon={L.icon({
-                    iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-                    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-                  })} 
-                />
-              )}
-            </MapContainer>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Price</label>
-            <div className="flex gap-2">
-              <select 
-                name="unit" 
-                value={formData.unit} 
-                onChange={handleInput}
-                className="border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-              >
-                <option value="USD">$</option>
-                <option value="Bound">Bound</option>
-                <option value="Free">Free</option>
-              </select>
-              <input 
-                name="price" 
-                type="number" 
-                placeholder="Amount" 
-                onChange={handleInput}
-                disabled={formData.unit === "Free"}
-                className="flex-1 border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent bg-white disabled:bg-gray-50" 
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Description</label>
-            <textarea 
-              name="description" 
-              placeholder="Tell us more about what you're sharing..."
-              onChange={handleInput}
-              className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent h-24" 
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Photos</label>
-            <input 
-              type="file" 
-              multiple 
-              accept="image/*" 
-              onChange={handlePhotoUpload} 
-              className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
-            />
-          </div>
-          
-          {formData.photos.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {formData.photos.map((file, i) => (
-                <img 
-                  key={i} 
-                  src={URL.createObjectURL(file)} 
-                  alt="preview"
-                  className="h-24 w-24 object-cover rounded-lg border border-gray-200" 
-                />
-              ))}
-            </div>
-          )}
-
-          <div className="pt-4 flex justify-end">
-            <button 
-              onClick={handleSubmit} 
-              disabled={isPublishing}
-              className={`bg-black text-white px-6 py-2.5 rounded-lg ${
-                isPublishing ? 'opacity-75' : 'hover:bg-gray-800'
-              } transition-colors`}
-            >
-              {isPublishing ? 'Publishing...' : 'Publish'}
-            </button>
-          </div>
-        </div>
+        )}
 
         {showSuccess && (
           <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in">
