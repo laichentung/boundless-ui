@@ -9,6 +9,26 @@ import CurrentLocationMarker from "../components/CurrentLocationMarker";
 import { supabase } from "../../lib/supabase";
 import AuthModal from "../components/AuthModal";
 
+// Category definitions with colors
+const categoryColors = {
+  // Activity categories
+  "Meal": "#FF6B6B", // Red
+  "Ride": "#4ECDC4", // Teal
+  "Meet-up": "#FFD166", // Yellow
+  "Entertainment": "#06D6A0", // Green
+  "Relaxation": "#118AB2", // Blue
+  "Learning": "#073B4C", // Dark Blue
+  "Help": "#EF476F", // Pink
+  // Resource categories
+  "Food / Drinks": "#7209B7", // Purple
+  "Items": "#F72585", // Magenta
+  "Clothing": "#3A0CA3", // Indigo
+  "Space": "#4361EE", // Light Blue
+  "Parking": "#4CC9F0", // Sky Blue
+  // Other
+  "Others": "#A0A0A0" // Gray
+};
+
 // Fix Leaflet icon
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -28,6 +48,57 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const navigate = useNavigate();
+  const [selectedActivity, setSelectedActivity] = useState(null);
+  const [showActivityPreview, setShowActivityPreview] = useState(false);
+
+  const fetchActivities = async () => {
+    try {
+      const { data: activities, error } = await supabase
+        .from('activities')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedActivities = activities.map(activity => {
+        try {
+          let location;
+          if (Array.isArray(activity.location)) {
+            location = activity.location;
+          } else if (activity.location && typeof activity.location === 'object') {
+            location = [activity.location.lat, activity.location.lng];
+          } else if (activity.location && typeof activity.location === 'string') {
+            const coords = activity.location.split(',').map(Number);
+            if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
+              location = coords;
+            } else {
+              throw new Error('Invalid coordinate string');
+            }
+          } else {
+            throw new Error('Invalid location format');
+          }
+          
+          return {
+            ...activity,
+            location,
+            images: activity.photos || []
+          };
+        } catch (err) {
+          console.error('Error formatting activity location:', err, activity);
+          return {
+            ...activity,
+            location: [25.0330, 121.5654], // Default to Taipei
+            images: activity.photos || []
+          };
+        }
+      });
+
+      setActivities(formattedActivities);
+    } catch (error) {
+      console.error('Error fetching activities:', error);
+      setError('Failed to load activities');
+    }
+  };
 
   // Get current location on component mount
   useEffect(() => {
@@ -36,16 +107,20 @@ export default function Home() {
         (position) => {
           const { latitude, longitude } = position.coords;
           setMapCenter([latitude, longitude]);
-          if (mapRef) {
-            mapRef.setView([latitude, longitude], 15);
-          }
         },
         (error) => {
           console.error("Error getting location:", error);
         }
       );
     }
-  }, [mapRef]);
+  }, []);
+
+  // Update map view when mapRef or mapCenter changes
+  useEffect(() => {
+    if (mapRef && mapCenter) {
+      mapRef.setView(mapCenter, 15);
+    }
+  }, [mapRef, mapCenter]);
 
   // Set up auth state listener and fetch activities
   useEffect(() => {
@@ -60,48 +135,7 @@ export default function Home() {
         }
 
         // Fetch activities
-        const { data, error: activitiesError } = await supabase
-          .from('activities')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (activitiesError) throw activitiesError;
-        
-        // Format activities with proper location data
-        const formattedActivities = (data || []).map(activity => {
-          try {
-            let location;
-            if (Array.isArray(activity.location)) {
-              location = activity.location;
-            } else if (activity.location && typeof activity.location === 'object') {
-              location = [activity.location.lat, activity.location.lng];
-            } else if (activity.location && typeof activity.location === 'string') {
-              const coords = activity.location.split(',').map(Number);
-              if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
-                location = coords;
-              } else {
-                throw new Error('Invalid coordinate string');
-              }
-            } else {
-              throw new Error('Invalid location format');
-            }
-            
-            return {
-              ...activity,
-              location
-            };
-          } catch (err) {
-            console.error('Error formatting activity location:', err, activity);
-            return {
-              ...activity,
-              location: [25.0330, 121.5654]
-            };
-          }
-        });
-        
-        if (mounted) {
-          setActivities(formattedActivities);
-        }
+        await fetchActivities();
       } catch (error) {
         console.error('Error initializing app:', error);
         if (mounted) {
@@ -117,13 +151,65 @@ export default function Home() {
     initializeApp();
 
     // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
+    // Set up real-time subscription for activities
+    const activitiesSubscription = supabase
+      .channel('activities_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'activities'
+        },
+        async (payload) => {
+          console.log('Activity change detected:', payload);
+          if (payload.eventType === 'INSERT') {
+            try {
+              // Format the new activity's location
+              const newActivity = payload.new;
+              let location;
+              try {
+                if (Array.isArray(newActivity.location)) {
+                  location = newActivity.location;
+                } else if (newActivity.location && typeof newActivity.location === 'object') {
+                  location = [newActivity.location.lat, newActivity.location.lng];
+                } else if (newActivity.location && typeof newActivity.location === 'string') {
+                  const coords = newActivity.location.split(',').map(Number);
+                  if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
+                    location = coords;
+                  } else {
+                    throw new Error('Invalid coordinate string');
+                  }
+                } else {
+                  throw new Error('Invalid location format');
+                }
+              } catch (err) {
+                console.error('Error formatting new activity location:', err, newActivity);
+                location = [25.0330, 121.5654];
+              }
+
+              // Add the new activity to the list
+              setActivities(prevActivities => [{
+                ...newActivity,
+                location,
+                images: newActivity.photos || []
+              }, ...prevActivities]);
+            } catch (error) {
+              console.error('Error handling new activity:', error);
+            }
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      authSubscription.unsubscribe();
+      activitiesSubscription.unsubscribe();
     };
   }, []);
 
@@ -137,6 +223,57 @@ export default function Home() {
     } else {
       setShowCreate(true);
     }
+  };
+
+  // Function to get marker color based on category
+  const getMarkerColor = (category) => {
+    return categoryColors[category] || '#A0A0A0';
+  };
+
+  // Function to create custom marker icon
+  const createCustomIcon = (category, title) => {
+    const color = getMarkerColor(category);
+    return L.divIcon({
+      className: 'custom-div-icon',
+      html: `
+        <div class="relative">
+          <div class="absolute -top-6 left-1/2 transform -translate-x-1/2 whitespace-nowrap bg-white px-2 py-1 rounded shadow text-xs font-medium">
+            ${title}
+          </div>
+          <div class="w-4 h-4 rounded-full border-2 border-white shadow" style="background-color: ${color}"></div>
+        </div>
+      `,
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
+      popupAnchor: [0, -20]
+    });
+  };
+
+  // Function to create current location marker icon
+  const createCurrentLocationIcon = () => {
+    return L.divIcon({
+      className: 'current-location-icon',
+      html: `
+        <div class="relative">
+          <div class="absolute -top-8 left-1/2 transform -translate-x-1/2 text-xs font-medium text-black bg-white px-2 py-0.5 rounded shadow">
+            You are here
+          </div>
+          <div class="relative">
+            <div class="w-16 h-16 rounded-full border-4 border-white shadow-lg animate-pulse" style="background-color: #000000">
+              <div class="absolute inset-0 flex items-center justify-center">
+                <div class="w-8 h-8 rounded-full bg-white animate-ping"></div>
+              </div>
+            </div>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <div class="w-12 h-12 rounded-full border-2 border-white animate-ping" style="background-color: #000000"></div>
+            </div>
+          </div>
+        </div>
+      `,
+      iconSize: [64, 64],
+      iconAnchor: [32, 32],
+      popupAnchor: [0, -32]
+    });
   };
 
   if (error) {
@@ -219,14 +356,13 @@ export default function Home() {
                     <Marker
                       key={activity.id}
                       position={activity.location}
-                      icon={L.divIcon({
-                        className: 'custom-div-icon',
-                        html: `<div class="bg-white border rounded-full p-2 shadow">
-                                <div class="w-2 h-2 rounded-full bg-black"></div>
-                              </div>`,
-                        iconSize: [24, 24],
-                        iconAnchor: [12, 12]
-                      })}
+                      icon={createCustomIcon(activity.category, activity.title)}
+                      eventHandlers={{
+                        click: () => {
+                          setSelectedActivity(activity);
+                          setShowActivityPreview(true);
+                        }
+                      }}
                     />
                   );
                 })}
@@ -237,12 +373,133 @@ export default function Home() {
                 <input
                   type="text"
                   placeholder="Search..."
-                  className="w-full p-3 rounded-xl border border-gray-300 bg-white shadow"
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-white text-black placeholder-gray-400 shadow"
                 />
               </div>
 
+              {/* Activity Preview Modal */}
+              {showActivityPreview && selectedActivity && (
+                <div className="fixed inset-0 z-[1000]">
+                  <div 
+                    className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm" 
+                    onClick={() => setShowActivityPreview(false)}
+                  />
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-[400px] bg-white rounded-2xl shadow-lg max-h-[80vh] overflow-y-auto">
+                    <div className="sticky top-0 bg-white z-10 flex items-center justify-between p-4 border-b">
+                      <div className="flex items-center space-x-2">
+                        <span className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: getMarkerColor(selectedActivity.category) }}
+                        />
+                        <h3 className="text-lg font-semibold">{selectedActivity.title}</h3>
+                      </div>
+                      <button 
+                        onClick={() => setShowActivityPreview(false)}
+                        className="text-gray-400 hover:text-black p-2"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="p-4 space-y-4">
+                      {/* User Info */}
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                          <img 
+                            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedActivity.user_id || 'anonymous'}`}
+                            alt="Default avatar"
+                            className="w-full h-full"
+                          />
+                        </div>
+                        <div>
+                          <div className="font-medium">Anonymous User</div>
+                          <div className="text-xs text-gray-500">Posted {new Date(selectedActivity.created_at).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center text-sm text-gray-500">
+                        <span className="w-2 h-2 rounded-full mr-2" 
+                          style={{ backgroundColor: getMarkerColor(selectedActivity.category) }}
+                        />
+                        {selectedActivity.category}
+                      </div>
+                      <div className="text-sm text-gray-600 bg-gray-50 p-4 rounded-lg">
+                        {selectedActivity.description || 'No description provided'}
+                      </div>
+                      <div className="flex items-center text-sm text-gray-500 bg-gray-50 p-4 rounded-lg">
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="flex flex-col">
+                          <span className="font-medium">Price</span>
+                          <span>{selectedActivity.price || 'Free'}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-500 bg-gray-50 p-4 rounded-lg">
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="flex flex-col">
+                          <span className="font-medium">Time</span>
+                          <span>{new Date(selectedActivity.time_start).toLocaleString()} - 
+                          {new Date(selectedActivity.time_end).toLocaleString()}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-500 bg-gray-50 p-4 rounded-lg">
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <div className="flex flex-col">
+                          <span className="font-medium">Location</span>
+                          <span>{Array.isArray(selectedActivity.location) 
+                            ? selectedActivity.location.join(", ") 
+                            : 'Invalid location'}</span>
+                        </div>
+                      </div>
+
+                      {/* Image Preview */}
+                      {selectedActivity.photos && selectedActivity.photos.length > 0 ? (
+                        <div className="flex space-x-2 overflow-x-auto pb-2">
+                          {selectedActivity.photos.map((photo, index) => (
+                            <div 
+                              key={index} 
+                              className="flex-shrink-0 w-20 h-20 relative"
+                              onClick={() => {
+                                // Open full screen image view
+                                const img = new Image();
+                                img.src = photo;
+                                const w = window.open('', '_blank');
+                                w.document.write(img.outerHTML);
+                                w.document.title = `Image ${index + 1}`;
+                              }}
+                            >
+                              <img 
+                                src={photo}
+                                alt={`Activity image ${index + 1}`}
+                                className="w-full h-full object-cover rounded-lg"
+                                onError={(e) => {
+                                  console.error('Error loading image:', photo);
+                                  e.target.src = 'https://placehold.co/400x400?text=No+Image';
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 relative">
+                          <img 
+                            src="https://placehold.co/400x400?text=No+Image"
+                            alt="No image available"
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Action Buttons */}
-              <div className="absolute bottom-12 right-4 flex flex-col space-y-3 z-[1000]">
+              <div className="absolute bottom-12 right-4 flex flex-col space-y-3 z-[900]">
                 <button
                   className="bg-white border rounded-full p-3 shadow"
                   onClick={() => {
@@ -315,7 +572,7 @@ export default function Home() {
           </div>
         </div>
 
-        {showCreate && <CreateModal onClose={() => setShowCreate(false)} />}
+        {showCreate && <CreateModal onClose={() => setShowCreate(false)} onSuccess={fetchActivities} />}
         {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
       </div>
     </div>

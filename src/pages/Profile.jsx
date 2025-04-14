@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 import { useNavigate, Link } from "react-router-dom";
-import { LogOut, User, Settings, Wallet, Share2, Bot, CalendarCheck2, ListTodo } from "lucide-react";
+import { LogOut, User, Settings, Wallet, Share2, Bot, CalendarCheck2 } from "lucide-react";
 
 export default function Profile() {
   const [user, setUser] = useState(null);
@@ -116,7 +116,7 @@ export default function Profile() {
               <span className="text-xs mt-1">AI</span>
             </Link>
             <Link to="/todo" className="flex flex-col items-center">
-              <ListTodo className="w-5 h-5" />
+              <CalendarCheck2 className="w-5 h-5" />
               <span className="text-xs mt-1">To-do</span>
             </Link>
           </div>

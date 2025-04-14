@@ -1,11 +1,15 @@
 // 類別清單
 const activityCategories = [
   "Meal", "Ride", "Meet-up", "Entertainment",
-  "Relaxation", "Learning", "Help", "Others",
+  "Relaxation", "Learning", "Help"
 ];
 
 const resourceCategories = [
-  "Food / Drinks", "Items", "Clothing", "Space", "Parking", "Others",
+  "Food / Drinks", "Items", "Clothing", "Space", "Parking"
+];
+
+const otherCategories = [
+  "Others"
 ];
 
 import { useEffect, useState, useRef } from "react";
@@ -14,6 +18,7 @@ import { supabase } from "../../lib/supabase";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import AuthModal from "./AuthModal";
+import heic2any from "heic2any";
 
 // Fix Leaflet icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -62,15 +67,21 @@ export default function CreateModal({ onClose, onSuccess }) {
 
   const [formData, setFormData] = useState({
     title: "",
+    description: "",
     timeStart: "",
     timeEnd: "",
     price: "",
-    unit: "USD",
-    description: "",
+    unit: "TWD",
     photos: [],
   });
 
   const [user, setUser] = useState(null);
+
+  const categories = [
+    { id: 'activity', name: 'Activity' },
+    { id: 'resource', name: 'Resource' },
+    { id: 'others', name: 'Others' }
+  ];
 
   // Check authentication status when component mounts
   useEffect(() => {
@@ -87,9 +98,58 @@ export default function CreateModal({ onClose, onSuccess }) {
     setFormData({ ...formData, [name]: value });
   };
 
-  const handlePhotoUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
-    setFormData({ ...formData, photos: files });
+    if (files.length + formData.photos.length > 4) {
+      setError("You can only upload up to 4 images");
+      return;
+    }
+
+    const uploadPromises = files.map(async (file) => {
+      try {
+        // Check if the file is HEIC format
+        const isHeic = file.type === 'image/heic' || file.name.toLowerCase().endsWith('.heic');
+        
+        let imageFile = file;
+        if (isHeic) {
+          // Convert HEIC to JPEG using heic2any library
+          const convertedBlob = await heic2any({
+            blob: file,
+            toType: "image/jpeg",
+            quality: 0.8
+          });
+          imageFile = new File([convertedBlob], file.name.replace('.heic', '.jpg'), {
+            type: 'image/jpeg'
+          });
+        }
+
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `activity-images/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('activity-images')
+          .upload(filePath, imageFile);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('activity-images')
+          .getPublicUrl(filePath);
+
+        return publicUrl;
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        throw error;
+      }
+    });
+
+    try {
+      const uploadedUrls = await Promise.all(uploadPromises);
+      setFormData({ ...formData, photos: [...formData.photos, ...uploadedUrls] });
+    } catch (error) {
+      setError("Failed to upload images. Please try again.");
+    }
   };
 
   const recenter = async () => {
@@ -150,77 +210,53 @@ export default function CreateModal({ onClose, onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!user) {
-      setError("Please sign in to create an activity");
-      return;
-    }
-
-    // Validate required fields
-    if (!formData.title || !location || !formData.timeStart || !formData.timeEnd || !selectedCategory) {
-      setError("Please fill in all required fields");
-      return;
-    }
-
-    setIsPublishing(true);
     setError(null);
+    setIsPublishing(true);
 
     try {
-      // Upload photos if any
-      let uploadedPhotos = [];
-      if (formData.photos.length > 0) {
-        for (const file of formData.photos) {
-          const fileExt = file.name.split('.').pop();
-          const fileName = `${Math.random()}.${fileExt}`;
-          const filePath = `${fileName}`;
+      // Check if user is signed in
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("You must be signed in to create an activity");
+      }
 
-          const { error: uploadError } = await supabase.storage
-            .from('activity-images')
-            .upload(filePath, file);
-
-          if (uploadError) {
-            throw uploadError;
-          }
-
-          // Get the public URL of the uploaded image
-          const { data: { publicUrl } } = supabase.storage
-            .from('activity-images')
-            .getPublicUrl(filePath);
-
-          uploadedPhotos.push(publicUrl);
-        }
+      // Validate required fields
+      if (!formData.title || !location || !formData.timeStart || !formData.timeEnd || !selectedCategory) {
+        throw new Error("Please fill in all required fields");
       }
 
       // Create activity data
       const activityData = {
         title: formData.title,
-        description: formData.description,
-        type: "activity",
-        category: selectedCategory,
+        description: formData.description || null, // Make description optional
+        location: location,
         time_start: formData.timeStart,
         time_end: formData.timeEnd,
-        price: formData.price ? parseFloat(formData.price) : null,
-        unit: formData.unit,
-        location: location,
+        category: selectedCategory,
         user_id: user.id,
-        photos: uploadedPhotos  // Store all uploaded photo URLs
+        created_at: new Date().toISOString(),
+        photos: formData.photos // Add photos array to the activity data
       };
 
-      // Insert activity
-      const { data: activity, error: activityError } = await supabase
+      // Insert activity into database
+      const { error: insertError } = await supabase
         .from('activities')
-        .insert([activityData])
-        .select()
-        .single();
+        .insert([activityData]);
 
-      if (activityError) throw activityError;
+      if (insertError) throw insertError;
 
+      // Show success message
       setShowSuccess(true);
+      
+      // Wait for 2 seconds before closing the modal
       setTimeout(() => {
         onClose();
-        if (onSuccess) onSuccess();
+        if (onSuccess) {
+          onSuccess(); // Call the onSuccess callback to refresh activities
+        }
       }, 2000);
+
     } catch (err) {
-      console.error('Error creating activity:', err);
       setError(err.message);
     } finally {
       setIsPublishing(false);
@@ -296,6 +332,11 @@ export default function CreateModal({ onClose, onSuccess }) {
                     </optgroup>
                     <optgroup label="Resources">
                       {resourceCategories.map(category => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Other">
+                      {otherCategories.map(category => (
                         <option key={category} value={category}>{category}</option>
                       ))}
                     </optgroup>
@@ -419,20 +460,36 @@ export default function CreateModal({ onClose, onSuccess }) {
                     type="file" 
                     multiple 
                     accept="image/*" 
-                    onChange={handlePhotoUpload} 
+                    onChange={handleImageUpload} 
                     className="w-full border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent" 
                   />
                 </div>
                 
                 {formData.photos.length > 0 && (
                   <div className="flex gap-2 overflow-x-auto pb-2">
-                    {formData.photos.map((file, i) => (
-                      <img 
-                        key={i} 
-                        src={URL.createObjectURL(file)} 
-                        alt="preview"
-                        className="h-24 w-24 object-cover rounded-lg border border-gray-200" 
-                      />
+                    {formData.photos.map((photo, i) => (
+                      <div key={i} className="relative">
+                        <img 
+                          src={photo}
+                          alt="preview"
+                          className="h-24 w-24 object-cover rounded-lg border border-gray-200" 
+                          onError={(e) => {
+                            console.error('Error loading image:', photo);
+                            e.target.src = 'https://placehold.co/400x400?text=No+Image';
+                          }}
+                        />
+                        <button
+                          onClick={() => {
+                            setFormData({
+                              ...formData,
+                              photos: formData.photos.filter((_, index) => index !== i)
+                            });
+                          }}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center"
+                        >
+                          ×
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
