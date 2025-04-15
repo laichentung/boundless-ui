@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { MapContainer, TileLayer, Marker } from "react-leaflet";
-import { MapIcon, ListIcon, LocateFixed, Filter, Plus, User, Wallet, Share2, Bot, CalendarCheck2 } from "lucide-react";
+import { MapIcon, ListIcon, LocateFixed, Filter, Plus, User, Wallet, Share2, Bot, CalendarCheck2, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -8,6 +8,7 @@ import CreateModal from "../components/CreateModal";
 import CurrentLocationMarker from "../components/CurrentLocationMarker";
 import { supabase } from "../../lib/supabase";
 import AuthModal from "../components/AuthModal";
+import FilterModal from "../components/FilterModal";
 
 // Category definitions with colors
 const categoryColors = {
@@ -50,6 +51,11 @@ export default function Home() {
   const navigate = useNavigate();
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [showActivityPreview, setShowActivityPreview] = useState(false);
+  const [showFilter, setShowFilter] = useState(false);
+  const [filters, setFilters] = useState(null);
+  const [filteredActivities, setFilteredActivities] = useState([]);
+  const [showListDetail, setShowListDetail] = useState(false);
+  const [selectedListActivity, setSelectedListActivity] = useState(null);
 
   const fetchActivities = async () => {
     try {
@@ -276,6 +282,104 @@ export default function Home() {
     });
   };
 
+  // Function to calculate distance between two points
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Radius of the earth in km
+    const dLat = deg2rad(lat2 - lat1);
+    const dLon = deg2rad(lon2 - lon1);
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    return R * c; // Distance in km
+  };
+
+  const deg2rad = (deg) => {
+    return deg * (Math.PI/180);
+  };
+
+  const formatDistance = (distance) => {
+    if (distance < 1) {
+      return `${Math.round(distance * 1000)}m`;
+    }
+    return `${distance.toFixed(1)} km`;
+  };
+
+  // Add this function to format time in local timezone
+  const formatLocalTime = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  // Function to apply filters
+  const applyFilters = (newFilters) => {
+    setFilters(newFilters);
+    
+    const filtered = activities.filter(activity => {
+      // Category filter
+      if (newFilters.categories.length > 0 && !newFilters.categories.includes(activity.category)) {
+        return false;
+      }
+
+      // Price range filter
+      if (activity.price) {
+        const price = parseFloat(activity.price);
+        if (price < newFilters.priceRange[0] || price > newFilters.priceRange[1]) {
+          return false;
+        }
+      }
+
+      // Distance filter
+      if (mapCenter && activity.location) {
+        const distance = calculateDistance(
+          mapCenter[0],
+          mapCenter[1],
+          activity.location[0],
+          activity.location[1]
+        );
+        if (distance > newFilters.distance) {
+          return false;
+        }
+      }
+
+      // Time range filter
+      const activityStart = new Date(activity.time_start);
+      const activityEnd = new Date(activity.time_end);
+      const filterStart = new Date(newFilters.timeRange.start);
+      const filterEnd = new Date(newFilters.timeRange.end);
+      
+      if (activityStart > filterEnd || activityEnd < filterStart) {
+        return false;
+      }
+
+      // Has images filter
+      if (newFilters.hasImages && (!activity.photos || activity.photos.length === 0)) {
+        return false;
+      }
+
+      return true;
+    });
+
+    setFilteredActivities(filtered);
+  };
+
+  // Update filtered activities when activities or filters change
+  useEffect(() => {
+    if (filters) {
+      applyFilters(filters);
+    } else {
+      setFilteredActivities(activities);
+    }
+  }, [activities, filters]);
+
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -347,7 +451,7 @@ export default function Home() {
                 />
                 <CurrentLocationMarker onLocate={setMapCenter} setMap={setMapRef} />
                 
-                {activities.map((activity) => {
+                {filteredActivities.map((activity) => {
                   if (!Array.isArray(activity.location) || activity.location.length !== 2) {
                     console.warn('Invalid location data for activity:', activity);
                     return null;
@@ -396,7 +500,7 @@ export default function Home() {
                         onClick={() => setShowActivityPreview(false)}
                         className="text-gray-400 hover:text-black p-2"
                       >
-                        ✕
+                        <X className="w-5 h-5" />
                       </button>
                     </div>
                     <div className="p-4 space-y-4">
@@ -421,9 +525,42 @@ export default function Home() {
                         />
                         {selectedActivity.category}
                       </div>
+
                       <div className="text-sm text-gray-600 bg-gray-50 p-4 rounded-lg">
                         {selectedActivity.description || 'No description provided'}
                       </div>
+
+                      {/* Location */}
+                      <div className="flex items-center text-sm text-gray-500 bg-gray-50 p-4 rounded-lg">
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        </svg>
+                        <div className="flex flex-col">
+                          <span className="font-medium">Location</span>
+                          {selectedActivity.location && Array.isArray(selectedActivity.location) ? (
+                            <div>
+                              <span>{selectedActivity.location[0].toFixed(6)}, {selectedActivity.location[1].toFixed(6)}</span>
+                              {mapCenter && (
+                                <span className="ml-2 text-gray-500">
+                                  ({formatDistance(calculateDistance(
+                                    mapCenter[0],
+                                    mapCenter[1],
+                                    selectedActivity.location[0],
+                                    selectedActivity.location[1]
+                                  ))})
+                                </span>
+                              )}
+                              {selectedActivity.location_name && (
+                                <div className="mt-1">{selectedActivity.location_name}</div>
+                              )}
+                            </div>
+                          ) : (
+                            <span>Location not specified</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Price */}
                       <div className="flex items-center text-sm text-gray-500 bg-gray-50 p-4 rounded-lg">
                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -433,26 +570,15 @@ export default function Home() {
                           <span>{selectedActivity.price || 'Free'}</span>
                         </div>
                       </div>
+
+                      {/* Time */}
                       <div className="flex items-center text-sm text-gray-500 bg-gray-50 p-4 rounded-lg">
                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <div className="flex flex-col">
                           <span className="font-medium">Time</span>
-                          <span>{new Date(selectedActivity.time_start).toLocaleString()} - 
-                          {new Date(selectedActivity.time_end).toLocaleString()}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center text-sm text-gray-500 bg-gray-50 p-4 rounded-lg">
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <div className="flex flex-col">
-                          <span className="font-medium">Location</span>
-                          <span>{Array.isArray(selectedActivity.location) 
-                            ? selectedActivity.location.join(", ") 
-                            : 'Invalid location'}</span>
+                          <span>{formatLocalTime(selectedActivity.time_start)} - {formatLocalTime(selectedActivity.time_end)}</span>
                         </div>
                       </div>
 
@@ -510,7 +636,10 @@ export default function Home() {
                 >
                   <LocateFixed className="w-6 h-6 text-black" />
                 </button>
-                <button className="bg-white border rounded-full p-3 shadow">
+                <button 
+                  className="bg-white border rounded-full p-3 shadow"
+                  onClick={() => setShowFilter(true)}
+                >
                   <Filter className="w-6 h-6 text-black" />
                 </button>
                 <button
@@ -522,21 +651,265 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            <div className="p-4 space-y-4 overflow-y-auto h-[calc(100vh-120px)]">
-              {activities.length === 0 ? (
-                <div className="text-center text-gray-500 mt-8">
-                  No activities found
+            <div className="h-[calc(100vh-120px)] w-full relative">
+              {/* Search Bar */}
+              <div className="sticky top-0 z-10 px-4 py-3 bg-white border-b">
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-white text-black placeholder-gray-400 shadow"
+                />
+              </div>
+
+              {/* List View */}
+              <div className="p-4 space-y-3 overflow-y-auto h-[calc(100vh-180px)]">
+                {filteredActivities.length === 0 ? (
+                  <div className="text-center text-gray-500 mt-8">
+                    No activities found
+                  </div>
+                ) : (
+                  filteredActivities.map((activity) => (
+                    <div 
+                      key={activity.id} 
+                      className="bg-white rounded-xl shadow p-4 cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => {
+                        setSelectedListActivity(activity);
+                        setShowListDetail(true);
+                      }}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2">
+                            <span 
+                              className="w-2 h-2 rounded-full" 
+                              style={{ backgroundColor: getMarkerColor(activity.category) }}
+                            />
+                            <h3 className="font-semibold">{activity.title}</h3>
+                          </div>
+                          <div className="flex items-center text-sm text-gray-500 mt-1">
+                            <span className="w-2 h-2 rounded-full mr-2" 
+                              style={{ backgroundColor: getMarkerColor(activity.category) }}
+                            />
+                            {activity.category}
+                          </div>
+                          <div className="flex items-center text-sm text-gray-500 mt-1 space-x-4">
+                            <div className="flex items-center">
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              </svg>
+                              {mapCenter && activity.location && (
+                                <span>
+                                  {formatDistance(calculateDistance(
+                                    mapCenter[0],
+                                    mapCenter[1],
+                                    activity.location[0],
+                                    activity.location[1]
+                                  ))}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center">
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {activity.price || 'Free'}
+                            </div>
+                            <div className="flex items-center">
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {formatLocalTime(activity.time_start)}
+                            </div>
+                          </div>
+                        </div>
+                        {activity.photos && activity.photos.length > 0 && (
+                          <div className="relative w-20 h-20 ml-4 flex-shrink-0">
+                            {activity.photos.map((photo, index) => (
+                              <div 
+                                key={index}
+                                className="absolute w-full h-full"
+                                style={{
+                                  transform: `translate(${index * -4}px, ${index * -4}px)`,
+                                  zIndex: activity.photos.length - index
+                                }}
+                              >
+                                <img 
+                                  src={photo} 
+                                  alt="Activity preview"
+                                  className="w-full h-full object-cover rounded-lg border-2 border-white"
+                                  onError={(e) => {
+                                    console.error('Error loading image:', photo);
+                                    e.target.src = 'https://placehold.co/400x400?text=No+Image';
+                                  }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="absolute bottom-12 right-4 flex flex-col space-y-3 z-[900]">
+                <button 
+                  className="bg-white border rounded-full p-3 shadow"
+                  onClick={() => setShowFilter(true)}
+                >
+                  <Filter className="w-6 h-6 text-black" />
+                </button>
+                <button
+                  onClick={handleCreateClick}
+                  className="bg-black text-white rounded-full p-3 shadow"
+                >
+                  <Plus className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* List Detail Modal */}
+          {showListDetail && selectedListActivity && (
+            <div className="fixed inset-0 z-[1000]">
+              <div 
+                className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm" 
+                onClick={() => setShowListDetail(false)}
+              />
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-[400px] bg-white rounded-2xl shadow-lg max-h-[80vh] overflow-y-auto">
+                <div className="sticky top-0 bg-white z-10 flex items-center justify-between p-4 border-b">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: getMarkerColor(selectedListActivity.category) }}
+                    />
+                    <h3 className="text-lg font-semibold">{selectedListActivity.title}</h3>
+                  </div>
+                  <button 
+                    onClick={() => setShowListDetail(false)}
+                    className="text-gray-400 hover:text-black p-2"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-              ) : (
-                activities.map((activity) => (
-                  <div key={activity.id} className="bg-white rounded-xl shadow p-4">
-                    <div className="font-semibold">{activity.title}</div>
-                    <div className="text-sm text-gray-600">
-                      {Array.isArray(activity.location) ? activity.location.join(", ") : 'Invalid location'} · {new Date(activity.time_start).toLocaleTimeString()}
+                <div className="p-4 space-y-4">
+                  {/* User Info */}
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                      <img 
+                        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedListActivity.user_id || 'anonymous'}`}
+                        alt="Default avatar"
+                        className="w-full h-full"
+                      />
+                    </div>
+                    <div>
+                      <div className="font-medium">Anonymous User</div>
+                      <div className="text-xs text-gray-500">Posted {new Date(selectedListActivity.created_at).toLocaleDateString()}</div>
                     </div>
                   </div>
-                ))
-              )}
+
+                  <div className="flex items-center text-sm text-gray-500">
+                    <span className="w-2 h-2 rounded-full mr-2" 
+                      style={{ backgroundColor: getMarkerColor(selectedListActivity.category) }}
+                    />
+                    {selectedListActivity.category}
+                  </div>
+
+                  <div className="text-sm text-gray-600 bg-gray-50 p-4 rounded-lg">
+                    {selectedListActivity.description || 'No description provided'}
+                  </div>
+
+                  {/* Location */}
+                  <div className="flex items-center text-sm text-gray-500 bg-gray-50 p-4 rounded-lg">
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    </svg>
+                    <div className="flex flex-col">
+                      <span className="font-medium">Location</span>
+                      {selectedListActivity.location && Array.isArray(selectedListActivity.location) ? (
+                        <div>
+                          <span>{selectedListActivity.location[0].toFixed(6)}, {selectedListActivity.location[1].toFixed(6)}</span>
+                          {mapCenter && (
+                            <span className="ml-2 text-gray-500">
+                              ({formatDistance(calculateDistance(
+                                mapCenter[0],
+                                mapCenter[1],
+                                selectedListActivity.location[0],
+                                selectedListActivity.location[1]
+                              ))})
+                            </span>
+                          )}
+                          {selectedListActivity.location_name && (
+                            <div className="mt-1">{selectedListActivity.location_name}</div>
+                          )}
+                        </div>
+                      ) : (
+                        <span>Location not specified</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Price */}
+                  <div className="flex items-center text-sm text-gray-500 bg-gray-50 p-4 rounded-lg">
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="flex flex-col">
+                      <span className="font-medium">Price</span>
+                      <span>{selectedListActivity.price || 'Free'}</span>
+                    </div>
+                  </div>
+
+                  {/* Time */}
+                  <div className="flex items-center text-sm text-gray-500 bg-gray-50 p-4 rounded-lg">
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="flex flex-col">
+                      <span className="font-medium">Time</span>
+                      <span>{formatLocalTime(selectedListActivity.time_start)} - {formatLocalTime(selectedListActivity.time_end)}</span>
+                    </div>
+                  </div>
+
+                  {/* Image Preview */}
+                  {selectedListActivity.photos && selectedListActivity.photos.length > 0 ? (
+                    <div className="flex space-x-2 overflow-x-auto pb-2">
+                      {selectedListActivity.photos.map((photo, index) => (
+                        <div 
+                          key={index} 
+                          className="flex-shrink-0 w-20 h-20 relative"
+                          onClick={() => {
+                            // Open full screen image view
+                            const img = new Image();
+                            img.src = photo;
+                            const w = window.open('', '_blank');
+                            w.document.write(img.outerHTML);
+                            w.document.title = `Image ${index + 1}`;
+                          }}
+                        >
+                          <img 
+                            src={photo}
+                            alt={`Activity image ${index + 1}`}
+                            className="w-full h-full object-cover rounded-lg"
+                            onError={(e) => {
+                              console.error('Error loading image:', photo);
+                              e.target.src = 'https://placehold.co/400x400?text=No+Image';
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="w-20 h-20 relative">
+                      <img 
+                        src="https://placehold.co/400x400?text=No+Image"
+                        alt="No image available"
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -574,6 +947,13 @@ export default function Home() {
 
         {showCreate && <CreateModal onClose={() => setShowCreate(false)} onSuccess={fetchActivities} />}
         {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+        {showFilter && (
+          <FilterModal 
+            onClose={() => setShowFilter(false)} 
+            onApply={applyFilters}
+            currentFilters={filters}
+          />
+        )}
       </div>
     </div>
   );

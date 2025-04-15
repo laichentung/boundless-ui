@@ -210,8 +210,8 @@ export default function CreateModal({ onClose, onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
     setIsPublishing(true);
+    setError(null);
 
     try {
       // Check if user is signed in
@@ -225,13 +225,17 @@ export default function CreateModal({ onClose, onSuccess }) {
         throw new Error("Please fill in all required fields");
       }
 
-      // Create activity data
+      // Convert local times to UTC before saving
+      const timeStart = new Date(formData.timeStart);
+      const timeEnd = new Date(formData.timeEnd);
+
+      // Create activity data with UTC times
       const activityData = {
         title: formData.title,
         description: formData.description || null, // Make description optional
         location: location,
-        time_start: formData.timeStart,
-        time_end: formData.timeEnd,
+        time_start: timeStart.toISOString(), // Convert to ISO string (UTC)
+        time_end: timeEnd.toISOString(), // Convert to ISO string (UTC)
         category: selectedCategory,
         user_id: user.id,
         created_at: new Date().toISOString(),
